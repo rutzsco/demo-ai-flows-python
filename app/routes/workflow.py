@@ -1,5 +1,3 @@
-# app/routes/workflow.py
-
 from fastapi import APIRouter
 from pydantic import BaseModel
 from ..services.sk import SemanticKernelService

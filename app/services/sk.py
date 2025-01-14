@@ -27,5 +27,5 @@ class SemanticKernelService:
         pass
 
     async def run_workflow(self, data: str) -> str:
-        result = await self.kernel.invoke_prompt("Why is the sky blue in one sentence?")
+        result = await self.kernel.invoke_prompt(data)
         return f"Processed with Semantic Kernel: {result}"
