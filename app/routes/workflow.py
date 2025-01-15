@@ -16,3 +16,11 @@ async def run_workflow(input_data: WorkflowInput):
     """
     result = await sk_service.run_workflow(input_data.data)
     return {"result": result}
+
+@router.post("/weather")
+async def run_weather_workflow(input_data: WorkflowInput):
+    """
+    POST endpoint for executing a weather workflow.
+    """
+    result = await sk_service.run_weather(input_data.data)
+    return {"result": result}
