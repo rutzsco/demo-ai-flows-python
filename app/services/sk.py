@@ -34,7 +34,7 @@ class SemanticKernelService:
             endpoint=endpoint,
             deployment_name=deployment_name
         ))
-        self.kernel.add_plugin(WeatherPlugin(), plugin_name="weather")
+        self.kernel.add_plugin(WeatherPlugin(self.kernel), plugin_name="weather")
         pass
 
     async def run_workflow(self, data: str) -> str:
@@ -44,6 +44,5 @@ class SemanticKernelService:
     async def run_weather(self, data: str) -> str:
         settings: OpenAIChatPromptExecutionSettings = self.kernel.get_prompt_execution_settings_from_service_id(service_id="default")
         settings.function_choice_behavior = FunctionChoiceBehavior.Auto(filters={"included_plugins": ["weather"]})
-
         result = await self.kernel.invoke_prompt(data, settings=settings)
         return f"{result}"

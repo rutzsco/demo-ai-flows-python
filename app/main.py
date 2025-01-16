@@ -61,8 +61,8 @@ if ai_connection_string:
     configure_metric(AzureMonitorMetricExporter(connection_string=ai_connection_string))
 else:
     configure_tracer(ConsoleSpanExporter())
-    configure_logger(ConsoleLogExporter())
-    configure_metric(ConsoleMetricExporter())
+    #configure_logger(ConsoleLogExporter())
+    #configure_metric(ConsoleMetricExporter())
 
 # FastAPI app setup
 app = FastAPI()
