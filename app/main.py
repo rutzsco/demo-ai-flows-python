@@ -7,6 +7,7 @@ from azure.monitor.opentelemetry.exporter import (
     AzureMonitorMetricExporter,
     AzureMonitorTraceExporter,
 )
+from azure.monitor.opentelemetry import configure_azure_monitor
 from opentelemetry._logs import set_logger_provider
 from opentelemetry.metrics import set_meter_provider
 from opentelemetry.sdk._logs import LoggerProvider, LoggingHandler
@@ -23,10 +24,11 @@ from dotenv import load_dotenv
 import os
 
 load_dotenv()
-ai_connection_string = os.getenv("AZURE_APPINSIGHTS_CONNECTION_STRING")
+ai_connection_string = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING")
 resource = Resource.create({ResourceAttributes.SERVICE_NAME: "demo-ai-flows-python"})
 
 # Setup logging functions
+configure_azure_monitor()
 def configure_tracer(exporter):
     tracer_provider = TracerProvider(resource=resource)
     tracer_provider.add_span_processor(BatchSpanProcessor(exporter))
