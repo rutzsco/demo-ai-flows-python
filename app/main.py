@@ -20,6 +20,9 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor, ConsoleSpanExporter
 from opentelemetry.semconv.resource import ResourceAttributes
 from opentelemetry.trace import set_tracer_provider
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.instrumentation.requests import RequestsInstrumentor
+
 from dotenv import load_dotenv
 import os
 
@@ -28,7 +31,10 @@ ai_connection_string = os.getenv("APPLICATIONINSIGHTS_CONNECTION_STRING")
 resource = Resource.create({ResourceAttributes.SERVICE_NAME: "demo-ai-flows-python"})
 
 # Setup logging functions
-configure_azure_monitor()
+# configure_azure_monitor()
+
+# Instrumenting the requests library for OpenTelemetry tracing
+RequestsInstrumentor().instrument()
 def configure_tracer(exporter):
     tracer_provider = TracerProvider(resource=resource)
     tracer_provider.add_span_processor(BatchSpanProcessor(exporter))
@@ -40,7 +46,7 @@ def configure_logger(exporter):
     set_logger_provider(logger_provider)
 
     handler = LoggingHandler()
-    handler.addFilter(logging.Filter("semantic_kernel"))
+    #handler.addFilter(logging.Filter("semantic_kernel"))
     logger = logging.getLogger()
     logger.addHandler(handler)
     logger.setLevel(logging.INFO)
@@ -70,3 +76,5 @@ else:
 app = FastAPI()
 app.include_router(workflow_router)
 app.include_router(status_router)
+FastAPIInstrumentor.instrument_app(app)
+
