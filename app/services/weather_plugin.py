@@ -1,4 +1,5 @@
 import requests
+import json
 from typing import Annotated
 from semantic_kernel.functions.kernel_function_decorator import kernel_function
 from dataclasses import dataclass
@@ -35,10 +36,21 @@ class WeatherPlugin:
 
         return forecast_response_body
             
-    #@kernel_function(name="determine_lat_long", description="Get a latitude and longitude GeoPoint for the provided city or postal code.")
-    async def determine_lat_long_async(self, location: Annotated[str, "A location string as a city and state or postal code"]) -> Annotated[LocationPoint, "The location GeoPoint"]:
-        search_answer = await self.kernel.invoke_prompt(f"What is the geopoint for: {location}")
-        search_answer = search_answer.strip('"')  # Remove any surrounding quotes
-        parts = [part.strip() for part in search_answer.split(',')]
-        lp = LocationPoint(Latitude=float(parts[0]), Longitude=float(parts[1]))
-        return lp
+    @kernel_function(name="get_lat_long", description="Get a latitude and longitude GeoPoint for the provided city or postal code.")
+    async def determine_lat_long_async(self, arguments: KernelArguments, location: Annotated[str, "A location string as a city and state or postal code"]) -> Annotated[LocationPoint, "The location GeoPoint"]:
+        # Use the LLM get the latitude and longitude
+        result = await self.kernel.invoke_prompt(f"What is the geopoint for: {location}. Return the result as a JSON object with Latitude and Longitude properties: {{\"Latitude\": 0.0, \"Longitude\": 0.0}}. Only return the JSON.", max_tokens=100)
+        
+        # Parse the result to extract the JSON object
+        json_result  = f"{result}".strip("'")
+        json_data = json.loads(json_result)
+        location = LocationPoint(
+            Latitude=json_data["Latitude"],
+            Longitude=json_data["Longitude"]
+        )
+
+        # Add the diagnostic result to the arguments
+        diagnostic_result = ExecutionStep(name="get_lat_long", content=json_data)
+        arguments["diagnostics"].append(diagnostic_result)
+
+        return location
