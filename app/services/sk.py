@@ -16,6 +16,8 @@ from semantic_kernel.functions.kernel_function_decorator import kernel_function
 from semantic_kernel.kernel import Kernel
 from semantic_kernel.connectors.ai.prompt_execution_settings import PromptExecutionSettings
 from opentelemetry import trace
+from app.models.api_models import ExecutionStep, ExecutionDiagnostics, RequestResult
+from typing import List
 
 class SemanticKernelService:
     def __init__(self):
@@ -53,9 +55,14 @@ class SemanticKernelService:
             )
             #settings: OpenAIChatPromptExecutionSettings = self.kernel.get_prompt_execution_settings_from_service_id(service_id="default")
             #settings.function_choice_behavior = FunctionChoiceBehavior.Auto(filters={"included_plugins": ["weather"]})
-
             #kernel_arguments  = KernelArguments()
-            #kernel_arguments ["diagnostics"] = []
 
+            kernel_arguments ["diagnostics"] = []
             result = await self.kernel.invoke_prompt(data, arguments=kernel_arguments )
-            return f"{result}"
+
+            request_result = RequestResult(
+                content=f"{result}",
+                execution_diagnostics=ExecutionDiagnostics(steps=kernel_arguments ["diagnostics"]))
+
+            return request_result
+

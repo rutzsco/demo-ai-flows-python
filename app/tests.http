@@ -1,0 +1,9 @@
+@baseUrl = http://127.0.0.1:8000
+
+### Demo - Weather  
+POST {{baseUrl}}/weather
+Content-Type: application/json
+
+{
+  "data": "weather forecast for mankato mn"
+}

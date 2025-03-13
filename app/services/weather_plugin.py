@@ -4,7 +4,7 @@ from semantic_kernel.functions.kernel_function_decorator import kernel_function
 from dataclasses import dataclass
 from semantic_kernel.kernel import Kernel
 from semantic_kernel.functions.kernel_arguments import KernelArguments
-from app.models.diagnostics import FunctionCallResult
+from app.models.api_models import ExecutionStep
 
 @dataclass
 class LocationPoint:
@@ -30,7 +30,7 @@ class WeatherPlugin:
         forecast_response_body = forecast_response.text
 
         # Add the diagnostic result to the arguments
-        diagnostic_result = FunctionCallResult(name="get_weather_for_latitude_longitude", content="forecast_response_body")
+        diagnostic_result = ExecutionStep(name="get_weather_for_latitude_longitude", content=forecast_response_body)
         arguments["diagnostics"].append(diagnostic_result)
 
         return forecast_response_body
