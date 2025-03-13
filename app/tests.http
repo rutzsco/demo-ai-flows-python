@@ -5,5 +5,10 @@ POST {{baseUrl}}/weather
 Content-Type: application/json
 
 {
-  "data": "weather forecast for mankato mn"
+  "messages": [
+    {
+      "role": "User",
+      "content": "What is the weather in mankato MN"
+    }
+  ]
 }

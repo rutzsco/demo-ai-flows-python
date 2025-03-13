@@ -15,3 +15,12 @@ class RequestResult:
     """A simple DTO for function call results."""
     content: str
     execution_diagnostics: ExecutionDiagnostics = field(default_factory=ExecutionDiagnostics)
+
+@dataclass
+class ChatMessage:
+    role: str
+    content: str
+
+@dataclass
+class ChatRequest:
+    messages: List[ChatMessage] = field(default_factory=list)

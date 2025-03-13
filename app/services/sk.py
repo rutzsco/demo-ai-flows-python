@@ -16,7 +16,7 @@ from semantic_kernel.functions.kernel_function_decorator import kernel_function
 from semantic_kernel.kernel import Kernel
 from semantic_kernel.connectors.ai.prompt_execution_settings import PromptExecutionSettings
 from opentelemetry import trace
-from app.models.api_models import ExecutionStep, ExecutionDiagnostics, RequestResult
+from app.models.api_models import ChatRequest, ExecutionStep, ExecutionDiagnostics, RequestResult
 from typing import List
 
 class SemanticKernelService:
@@ -45,7 +45,7 @@ class SemanticKernelService:
         result = await self.kernel.invoke_prompt(data)
         return f"Processed with Semantic Kernel: {result}"
     
-    async def run_weather(self, data: str) -> str:
+    async def run_weather(self, request: ChatRequest) -> str:
         tracer = trace.get_tracer(__name__)
         with tracer.start_as_current_span("Agent: Weather") as current_span:
             kernel_arguments = KernelArguments(
@@ -55,7 +55,10 @@ class SemanticKernelService:
             )
 
             kernel_arguments ["diagnostics"] = []
-            result = await self.kernel.invoke_prompt(data, arguments=kernel_arguments )
+            if not request.messages:
+                raise ValueError("No messages found in request.")
+            data = request.messages[-1].content
+            result = await self.kernel.invoke_prompt(data, arguments=kernel_arguments)
 
             request_result = RequestResult(
                 content=f"{result}",

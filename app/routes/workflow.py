@@ -1,6 +1,7 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-from ..services.sk import SemanticKernelService
+from app.models.api_models import ChatRequest
+from app.services.sk import SemanticKernelService
 import asyncio
 router = APIRouter()
 
@@ -18,9 +19,9 @@ async def run_workflow(input_data: WorkflowInput):
     return {"result": result}
 
 @router.post("/weather")
-async def run_weather_workflow(input_data: WorkflowInput):
+async def run_weather_workflow(input_data: ChatRequest):
     """
     POST endpoint for executing a weather workflow.
     """
-    result = await sk_service.run_weather(input_data.data)
+    result = await sk_service.run_weather(input_data)
     return {"result": result}
