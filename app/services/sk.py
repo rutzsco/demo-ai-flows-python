@@ -53,9 +53,6 @@ class SemanticKernelService:
                 function_choice_behavior=FunctionChoiceBehavior.Auto(filters={"included_plugins": ["weather"]}),
                 )
             )
-            #settings: OpenAIChatPromptExecutionSettings = self.kernel.get_prompt_execution_settings_from_service_id(service_id="default")
-            #settings.function_choice_behavior = FunctionChoiceBehavior.Auto(filters={"included_plugins": ["weather"]})
-            #kernel_arguments  = KernelArguments()
 
             kernel_arguments ["diagnostics"] = []
             result = await self.kernel.invoke_prompt(data, arguments=kernel_arguments )
