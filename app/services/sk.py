@@ -14,6 +14,8 @@ from semantic_kernel.core_plugins.time_plugin import TimePlugin
 from semantic_kernel.functions.kernel_arguments import KernelArguments
 from semantic_kernel.functions.kernel_function_decorator import kernel_function
 from semantic_kernel.kernel import Kernel
+from semantic_kernel.connectors.ai.prompt_execution_settings import PromptExecutionSettings
+from opentelemetry import trace
 
 class SemanticKernelService:
     def __init__(self):
@@ -42,7 +44,18 @@ class SemanticKernelService:
         return f"Processed with Semantic Kernel: {result}"
     
     async def run_weather(self, data: str) -> str:
-        settings: OpenAIChatPromptExecutionSettings = self.kernel.get_prompt_execution_settings_from_service_id(service_id="default")
-        settings.function_choice_behavior = FunctionChoiceBehavior.Auto(filters={"included_plugins": ["weather"]})
-        result = await self.kernel.invoke_prompt(data, settings=settings)
-        return f"{result}"
+        tracer = trace.get_tracer(__name__)
+        with tracer.start_as_current_span("Agent: Weather") as current_span:
+            kernel_arguments = KernelArguments(
+            settings=PromptExecutionSettings(
+                function_choice_behavior=FunctionChoiceBehavior.Auto(filters={"included_plugins": ["weather"]}),
+                )
+            )
+            #settings: OpenAIChatPromptExecutionSettings = self.kernel.get_prompt_execution_settings_from_service_id(service_id="default")
+            #settings.function_choice_behavior = FunctionChoiceBehavior.Auto(filters={"included_plugins": ["weather"]})
+
+            #kernel_arguments  = KernelArguments()
+            #kernel_arguments ["diagnostics"] = []
+
+            result = await self.kernel.invoke_prompt(data, arguments=kernel_arguments )
+            return f"{result}"

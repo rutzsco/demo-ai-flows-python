@@ -3,6 +3,8 @@ from typing import Annotated
 from semantic_kernel.functions.kernel_function_decorator import kernel_function
 from dataclasses import dataclass
 from semantic_kernel.kernel import Kernel
+from semantic_kernel.functions.kernel_arguments import KernelArguments
+from app.models.diagnostics import FunctionCallResult
 
 @dataclass
 class LocationPoint:
@@ -14,7 +16,7 @@ class WeatherPlugin:
         self.kernel = kernel
   
     @kernel_function(name="get_weather_for_latitude_longitude", description="get the weather for a latitude and longitude GeoPoint")
-    async def get_weather_for_latitude_longitude(self, latitude: Annotated[str, "The location GeoPoint latitude"], longitude: Annotated[str, "The location GeoPoint longitude"]) -> Annotated[str, "The output is a string"]:
+    async def get_weather_for_latitude_longitude(self, arguments: KernelArguments, latitude: Annotated[str, "The location GeoPoint latitude"], longitude: Annotated[str, "The location GeoPoint longitude"]) -> Annotated[str, "The output is a string"]:
         url = f"https://api.weather.gov/points/{latitude},{longitude}"
         headers = {"User-Agent": "app"}
 
@@ -26,6 +28,10 @@ class WeatherPlugin:
         forecast_response = requests.get(forecast_url, headers=headers)
         forecast_response.raise_for_status()
         forecast_response_body = forecast_response.text
+
+        # Add the diagnostic result to the arguments
+        diagnostic_result = FunctionCallResult(name="get_weather_for_latitude_longitude", content="forecast_response_body")
+        arguments["diagnostics"].append(diagnostic_result)
 
         return forecast_response_body
             
