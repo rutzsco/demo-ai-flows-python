@@ -19,6 +19,7 @@ from opentelemetry import trace
 from app.models.api_models import ChatRequest, ExecutionStep, ExecutionDiagnostics, RequestResult
 from typing import List
 from app.prompts.file_service import FileService 
+from semantic_kernel.agents import ChatCompletionAgent
 
 class SemanticKernelService:
     def __init__(self):
@@ -80,6 +81,37 @@ class SemanticKernelService:
 
             request_result = RequestResult(
                 content=f"{chat_result}",
+                execution_diagnostics=ExecutionDiagnostics(steps=kernel_arguments ["diagnostics"]))
+
+            return request_result
+        
+    async def run_weather_agent(self, request: ChatRequest) -> str:
+        tracer = trace.get_tracer(__name__)
+        with tracer.start_as_current_span("Agent: Weather") as current_span:
+            # Validate the request object
+            if not request.messages:
+                raise ValueError("No messages found in request.")
+            
+            settings=PromptExecutionSettings(
+                function_choice_behavior=FunctionChoiceBehavior.Auto(filters={"included_plugins": ["weather"]}),
+            )
+            kernel_arguments = KernelArguments(settings=settings)
+            kernel_arguments ["diagnostics"] = []
+
+            system_message = self.file_service.read_file('WeatherSystemPrompt.txt')
+            user_message = request.messages[-1].content
+
+            agent = ChatCompletionAgent(
+                kernel=self.kernel, 
+                name="WeatherAgent", 
+                instructions=system_message,
+                arguments=kernel_arguments
+            )
+            
+            response = await agent.get_response(messages=user_message)
+
+            request_result = RequestResult(
+                content=f"{response}",
                 execution_diagnostics=ExecutionDiagnostics(steps=kernel_arguments ["diagnostics"]))
 
             return request_result

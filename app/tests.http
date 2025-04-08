@@ -12,3 +12,16 @@ Content-Type: application/json
     }
   ]
 }
+
+### Demo - Weather  
+POST {{baseUrl}}/agent/weather
+Content-Type: application/json
+
+{
+  "messages": [
+    {
+      "role": "User",
+      "content": "What is the weather in mankato MN"
+    }
+  ]
+}

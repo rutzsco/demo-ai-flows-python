@@ -25,3 +25,11 @@ async def run_weather_workflow(input_data: ChatRequest):
     """
     result = await sk_service.run_weather(input_data)
     return {"result": result}
+
+@router.post("/agent/weather")
+async def run_weather_workflow(input_data: ChatRequest):
+    """
+    POST endpoint for executing a weather workflow.
+    """
+    result = await sk_service.run_weather_agent(input_data)
+    return {"result": result}
