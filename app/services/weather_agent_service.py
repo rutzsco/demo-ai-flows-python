@@ -1,25 +1,21 @@
-from app.services.weather_plugin import WeatherPlugin
-import semantic_kernel as sk
-from semantic_kernel.connectors.ai.open_ai import AzureChatCompletion
-from dotenv import load_dotenv
 import os
-from semantic_kernel.connectors.ai.function_choice_behavior import FunctionChoiceBehavior
-from semantic_kernel.connectors.ai.open_ai import AzureChatCompletion, OpenAIChatCompletion
-from semantic_kernel.connectors.ai.open_ai.prompt_execution_settings.open_ai_prompt_execution_settings import (
-    OpenAIChatPromptExecutionSettings,
-)
-from semantic_kernel.contents.chat_history import ChatHistory
-from semantic_kernel.contents.function_call_content import FunctionCallContent
-from semantic_kernel.core_plugins.time_plugin import TimePlugin
-from semantic_kernel.functions.kernel_arguments import KernelArguments
-from semantic_kernel.functions.kernel_function_decorator import kernel_function
-from semantic_kernel.kernel import Kernel
-from semantic_kernel.connectors.ai.prompt_execution_settings import PromptExecutionSettings
-from opentelemetry import trace
-from app.models.api_models import ChatRequest, ExecutionStep, ExecutionDiagnostics, RequestResult
 from typing import List
-from app.prompts.file_service import FileService 
+
+import semantic_kernel as sk
+from dotenv import load_dotenv
+from opentelemetry import trace
+
+from app.models.api_models import ChatRequest, ExecutionDiagnostics, RequestResult
+from app.prompts.file_service import FileService
+from app.services.weather_plugin import WeatherPlugin
+
 from semantic_kernel.agents import ChatCompletionAgent
+from semantic_kernel.connectors.ai.function_choice_behavior import FunctionChoiceBehavior
+from semantic_kernel.connectors.ai.open_ai import AzureChatCompletion
+from semantic_kernel.connectors.ai.prompt_execution_settings import PromptExecutionSettings
+from semantic_kernel.contents import ChatMessageContent
+from semantic_kernel.contents.chat_history import ChatHistory
+from semantic_kernel.functions.kernel_arguments import KernelArguments
 
 class WeatherAgentService:
     def __init__(self):
@@ -45,7 +41,8 @@ class WeatherAgentService:
         self.file_service = FileService()
 
         pass
-  
+
+
     async def run_weather(self, request: ChatRequest) -> str:
         tracer = trace.get_tracer(__name__)
         with tracer.start_as_current_span("Agent: Weather") as current_span:
@@ -82,6 +79,15 @@ class WeatherAgentService:
             return request_result
         
     async def run_weather_agent(self, request: ChatRequest) -> str:
+
+        # Define a list to hold callback message content
+        intermediate_steps: list[ChatMessageContent] = []
+
+        # Define an async method to handle the `on_intermediate_message` callback
+        async def handle_intermediate_steps(message: ChatMessageContent) -> None:
+            if message.finish_reason == "tool_calls":
+                intermediate_steps.append(message)
+
         tracer = trace.get_tracer(__name__)
         with tracer.start_as_current_span("Agent: Weather") as current_span:
             # Validate the request object
@@ -104,10 +110,19 @@ class WeatherAgentService:
                 arguments=kernel_arguments
             )
             
-            response = await agent.get_response(messages=user_message)
+            # Iterate over the async generator to get the final response
+            response = None
+            thread = None
+            async for result in agent.invoke(messages=user_message, thread=thread, on_intermediate_message=handle_intermediate_steps):
+                response = result
+                thread = response.thread
+
+            if response is None:
+                raise ValueError("No response received from the agent.")
 
             request_result = RequestResult(
                 content=f"{response}",
-                execution_diagnostics=ExecutionDiagnostics(steps=kernel_arguments ["diagnostics"]))
+                execution_diagnostics=ExecutionDiagnostics(steps=kernel_arguments ["diagnostics"]),
+                intermediate_steps = intermediate_steps)
 
             return request_result
