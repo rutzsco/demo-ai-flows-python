@@ -16,6 +16,7 @@ from semantic_kernel.connectors.ai.prompt_execution_settings import PromptExecut
 from semantic_kernel.contents import ChatMessageContent
 from semantic_kernel.contents.chat_history import ChatHistory
 from semantic_kernel.functions.kernel_arguments import KernelArguments
+from semantic_kernel.contents import  ChatMessageContent, FunctionCallContent
 
 class WeatherAgentService:
     def __init__(self):
@@ -81,12 +82,14 @@ class WeatherAgentService:
     async def run_weather_agent(self, request: ChatRequest) -> str:
 
         # Define a list to hold callback message content
-        intermediate_steps: list[ChatMessageContent] = []
+        intermediate_steps: list[str] = []
 
         # Define an async method to handle the `on_intermediate_message` callback
         async def handle_intermediate_steps(message: ChatMessageContent) -> None:
-            if message.finish_reason == "tool_calls":
-                intermediate_steps.append(message)
+            if any(isinstance(item, FunctionCallContent) for item in message.items):
+                for fcc in message.items:
+                  if isinstance(fcc, FunctionCallContent):
+                      intermediate_steps.append(f"Function Call: {fcc.name} with arguments: {fcc.arguments}")
 
         tracer = trace.get_tracer(__name__)
         with tracer.start_as_current_span("Agent: Weather") as current_span:

@@ -1,6 +1,5 @@
 from dataclasses import dataclass, field
 from typing import List
-from semantic_kernel.contents import ChatMessageContent
 
 @dataclass
 class ExecutionStep:
@@ -16,7 +15,7 @@ class RequestResult:
     """A simple DTO for function call results."""
     content: str
     execution_diagnostics: ExecutionDiagnostics = field(default_factory=ExecutionDiagnostics)
-    intermediate_steps: list[ChatMessageContent] = field(default_factory=list)  
+    intermediate_steps: list[str] = field(default_factory=list)  
 
 @dataclass
 class ChatMessage:
