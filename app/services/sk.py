@@ -50,70 +50,7 @@ class SemanticKernelService:
         result = await self.kernel.invoke_prompt(data)
         return f"Processed with Semantic Kernel: {result}"
     
-    async def run_weather(self, request: ChatRequest) -> str:
-        tracer = trace.get_tracer(__name__)
-        with tracer.start_as_current_span("Agent: Weather") as current_span:
-            # Validate the request object
-            if not request.messages:
-                raise ValueError("No messages found in request.")
-            
-            chat_completion_service = self.kernel.get_service(service_id="azure-chat-completion")
-            settings=PromptExecutionSettings(
-                function_choice_behavior=FunctionChoiceBehavior.Auto(filters={"included_plugins": ["weather"]}),
-            )
-            kernel_arguments = KernelArguments()
-            kernel_arguments ["diagnostics"] = []
-
-            system_message = self.file_service.read_file('WeatherSystemPrompt.txt')
-            chat_history_1 = ChatHistory()
-            chat_history_1.add_system_message(system_message)
-            for message in request.messages:
-                if message.role.lower() == "user":
-                    chat_history_1.add_user_message(message.content)
-                elif message.role.lower() == "assistant":
-                    chat_history_1.add_assistant_message(message.content)
-            
-            chat_result = await chat_completion_service.get_chat_message_content(
-                chat_history=chat_history_1,
-                arguments=kernel_arguments, 
-                settings=settings,
-                kernel=self.kernel)  
-
-            request_result = RequestResult(
-                content=f"{chat_result}",
-                execution_diagnostics=ExecutionDiagnostics(steps=kernel_arguments ["diagnostics"]))
-
-            return request_result
         
-    async def run_weather_agent(self, request: ChatRequest) -> str:
-        tracer = trace.get_tracer(__name__)
-        with tracer.start_as_current_span("Agent: Weather") as current_span:
-            # Validate the request object
-            if not request.messages:
-                raise ValueError("No messages found in request.")
-            
-            settings=PromptExecutionSettings(
-                function_choice_behavior=FunctionChoiceBehavior.Auto(filters={"included_plugins": ["weather"]}),
-            )
-            kernel_arguments = KernelArguments(settings=settings)
-            kernel_arguments ["diagnostics"] = []
 
-            system_message = self.file_service.read_file('WeatherSystemPrompt.txt')
-            user_message = request.messages[-1].content
-
-            agent = ChatCompletionAgent(
-                kernel=self.kernel, 
-                name="WeatherAgent", 
-                instructions=system_message,
-                arguments=kernel_arguments
-            )
-            
-            response = await agent.get_response(messages=user_message)
-
-            request_result = RequestResult(
-                content=f"{response}",
-                execution_diagnostics=ExecutionDiagnostics(steps=kernel_arguments ["diagnostics"]))
-
-            return request_result
 
 

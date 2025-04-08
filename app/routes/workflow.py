@@ -2,10 +2,12 @@ from fastapi import APIRouter
 from pydantic import BaseModel
 from app.models.api_models import ChatRequest
 from app.services.sk import SemanticKernelService
+from app.services.weather_agent_service import WeatherAgentService
 import asyncio
 router = APIRouter()
 
 sk_service = SemanticKernelService()
+weather_service = WeatherAgentService()
 
 class WorkflowInput(BaseModel):
     data: str
@@ -23,7 +25,7 @@ async def run_weather_workflow(input_data: ChatRequest):
     """
     POST endpoint for executing a weather workflow.
     """
-    result = await sk_service.run_weather(input_data)
+    result = await weather_service.run_weather(input_data)
     return {"result": result}
 
 @router.post("/agent/weather")
@@ -31,5 +33,5 @@ async def run_weather_workflow(input_data: ChatRequest):
     """
     POST endpoint for executing a weather workflow.
     """
-    result = await sk_service.run_weather_agent(input_data)
+    result = await weather_service.run_weather_agent(input_data)
     return {"result": result}
