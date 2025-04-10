@@ -19,6 +19,7 @@ from semantic_kernel.functions.kernel_arguments import KernelArguments
 from semantic_kernel.contents import  ChatMessageContent, FunctionCallContent
 from azure.identity.aio import DefaultAzureCredential
 from semantic_kernel.agents import AzureAIAgent, AzureAIAgentSettings, AzureAIAgentThread
+from azure.ai.projects.models import BingGroundingTool 
 
 class ChatAgentService:
     def __init__(self):
@@ -50,12 +51,12 @@ class ChatAgentService:
             async with (DefaultAzureCredential() as creds, AzureAIAgent.create_client(credential=creds) as client,):
                 
                 # 1. Create an agent on the Azure AI agent service
-                agent_definition = await client.agents.create_agent(
-                    model=self.ai_agent_settings.model_deployment_name,
-                    name="Assistant",
-                    instructions="Answer the user's questions.",
-                )
-
+                #agent_definition = await client.agents.create_agent(
+                #    model=self.ai_agent_settings.model_deployment_name,
+                #    name="Assistant",
+                #    instructions="Answer the user's questions."
+                #)
+                agent_definition = await client.agents.get_agent(agent_id='asst_g8KPAp9JzA8LpqJOIiwIisL8')
                 # 2. Create a Semantic Kernel agent for the Azure AI agent
                 agent = AzureAIAgent(
                     client=client,
@@ -74,7 +75,7 @@ class ChatAgentService:
                 finally:
                     # 5. Cleanup: Delete the thread and agent
                     await thread.delete() if thread else None
-                    await client.agents.delete_agent(agent.id) if agent else None   
+ #                   await client.agents.delete_agent(agent.id) if agent else None   
 
             request_result = RequestResult(
                 content=f"{response}")
