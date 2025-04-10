@@ -2,6 +2,12 @@ from dataclasses import dataclass, field
 from typing import List
 
 @dataclass
+class Source:
+    quote: str
+    title: str
+    url: str
+
+@dataclass
 class ExecutionStep:
     name: str
     content: str
@@ -15,7 +21,8 @@ class RequestResult:
     """A simple DTO for function call results."""
     content: str
     execution_diagnostics: ExecutionDiagnostics = field(default_factory=ExecutionDiagnostics)
-    intermediate_steps: list[str] = field(default_factory=list)  
+    intermediate_steps: list[str] = field(default_factory=list)
+    sources: list[Source] = field(default_factory=list) 
 
 @dataclass
 class ChatMessage:

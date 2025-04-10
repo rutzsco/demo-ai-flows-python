@@ -5,7 +5,7 @@ import semantic_kernel as sk
 from dotenv import load_dotenv
 from opentelemetry import trace
 
-from app.models.api_models import ChatRequest, ExecutionDiagnostics, RequestResult
+from app.models.api_models import ChatRequest, ExecutionDiagnostics, RequestResult, Source
 from app.prompts.file_service import FileService
 from app.services.weather_plugin import WeatherPlugin
 
@@ -13,13 +13,12 @@ from semantic_kernel.agents import ChatCompletionAgent
 from semantic_kernel.connectors.ai.function_choice_behavior import FunctionChoiceBehavior
 from semantic_kernel.connectors.ai.open_ai import AzureChatCompletion
 from semantic_kernel.connectors.ai.prompt_execution_settings import PromptExecutionSettings
-from semantic_kernel.contents import ChatMessageContent
+from semantic_kernel.contents import AnnotationContent
 from semantic_kernel.contents.chat_history import ChatHistory
 from semantic_kernel.functions.kernel_arguments import KernelArguments
 from semantic_kernel.contents import  ChatMessageContent, FunctionCallContent
 from azure.identity.aio import DefaultAzureCredential
 from semantic_kernel.agents import AzureAIAgent, AzureAIAgentSettings, AzureAIAgentThread
-from azure.ai.projects.models import BingGroundingTool 
 
 class ChatAgentService:
     def __init__(self):
@@ -48,14 +47,19 @@ class ChatAgentService:
                 raise ValueError("No messages found in request.")
             user_message = request.messages[-1].content
 
+            # Define a list to hold callback message content
+            intermediate_steps: list[str] = []
+
+            # Define an async method to handle the `on_intermediate_message` callback
+            async def handle_intermediate_steps(message: ChatMessageContent) -> None:
+                if any(isinstance(item, FunctionCallContent) for item in message.items):
+                    for fcc in message.items:
+                        if isinstance(fcc, FunctionCallContent):
+                            intermediate_steps.append(f"Function Call: {fcc.name} with arguments: {fcc.arguments}")
+
             async with (DefaultAzureCredential() as creds, AzureAIAgent.create_client(credential=creds) as client,):
                 
                 # 1. Create an agent on the Azure AI agent service
-                #agent_definition = await client.agents.create_agent(
-                #    model=self.ai_agent_settings.model_deployment_name,
-                #    name="Assistant",
-                #    instructions="Answer the user's questions."
-                #)
                 agent_definition = await client.agents.get_agent(agent_id='asst_g8KPAp9JzA8LpqJOIiwIisL8')
                 # 2. Create a Semantic Kernel agent for the Azure AI agent
                 agent = AzureAIAgent(
@@ -68,16 +72,36 @@ class ChatAgentService:
                 # created and returned with the initial response
                 thread: AzureAIAgentThread = None
 
+                sources = []
+
                 try:
                     # 4. Invoke the agent with the specified message for response
-                    response = await agent.get_response(messages=user_message, thread=thread)
+                    response = await agent.get_response(
+                        messages=user_message, 
+                        thread=thread,
+                        on_intermediate_message=handle_intermediate_steps
+                    )
                     thread = response.thread
+                    
+                    # Extract annotations from the ChatMessageContent response
+                    for item in response.items:
+                        if isinstance(item, AnnotationContent):
+                            source = Source(
+                                quote=item.quote if hasattr(item, 'quote') else '',
+                                title=item.title if hasattr(item, 'title') else '',
+                                url=item.url if hasattr(item, 'url') else ''
+                            )
+                            sources.append(source)
+                
                 finally:
                     # 5. Cleanup: Delete the thread and agent
                     await thread.delete() if thread else None
- #                   await client.agents.delete_agent(agent.id) if agent else None   
+                    #await client.agents.delete_agent(agent.id) if agent else None   
 
             request_result = RequestResult(
-                content=f"{response}")
+                content=f"{response}",
+                sources=sources,
+                intermediate_steps=intermediate_steps
+            )
 
             return request_result
