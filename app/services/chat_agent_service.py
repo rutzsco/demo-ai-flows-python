@@ -48,14 +48,10 @@ class ChatAgentService:
             user_message = request.messages[-1].content
 
             # Define a list to hold callback message content
-            intermediate_steps: list[str] = []
-
-            # Define an async method to handle the `on_intermediate_message` callback
+            intermediate_steps: list[ChatMessageContent] = []
             async def handle_intermediate_steps(message: ChatMessageContent) -> None:
-                if any(isinstance(item, FunctionCallContent) for item in message.items):
-                    for fcc in message.items:
-                        if isinstance(fcc, FunctionCallContent):
-                            intermediate_steps.append(f"Function Call: {fcc.name} with arguments: {fcc.arguments}")
+                intermediate_steps.append(message)
+
 
             async with (DefaultAzureCredential() as creds, AzureAIAgent.create_client(credential=creds) as client,):
                 
@@ -76,12 +72,14 @@ class ChatAgentService:
 
                 try:
                     # 4. Invoke the agent with the specified message for response
-                    response = await agent.get_response(
-                        messages=user_message, 
-                        thread=thread,
-                        on_intermediate_message=handle_intermediate_steps
-                    )
-                    thread = response.thread
+                    #response = await agent.invoke(
+                    #    messages=user_message, 
+                    #    thread=thread
+                    #)
+                    #thread = response.thread
+                    async for result in agent.invoke(messages=user_message, thread=thread, on_intermediate_message=handle_intermediate_steps):
+                        response = result
+                        thread = response.thread
                     
                     # Extract annotations from the ChatMessageContent response
                     for item in response.items:
