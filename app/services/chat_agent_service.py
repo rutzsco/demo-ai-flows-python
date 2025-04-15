@@ -3,7 +3,7 @@ from typing import List
 from dotenv import load_dotenv
 from opentelemetry import trace
 from azure.ai.projects import AIProjectClient
-from app.models.api_models import ChatRequest, ExecutionDiagnostics, RequestResult, Source
+from app.models.api_models import ChatThreadRequest, ExecutionDiagnostics, RequestResult, Source
 from app.prompts.file_service import FileService
 
 
@@ -37,13 +37,13 @@ class ChatAgentService:
         pass
 
 
-    async def run_chat(self, request: ChatRequest) -> str:
+    async def run_chat(self, request: ChatThreadRequest) -> str:
         tracer = trace.get_tracer(__name__)
         with tracer.start_as_current_span("Agent: Chat") as current_span:
             # Validate the request object
-            if not request.messages:
+            if not request.message:
                 raise ValueError("No messages found in request.")
-            user_message = request.messages[-1].content
+            user_message = request.message
 
             # Define a list to hold callback message content
             intermediate_steps: list[ChatMessageContent] = []
@@ -64,7 +64,10 @@ class ChatAgentService:
                 # 3. Create a thread for the agent
                 # If no thread is provided, a new thread will be
                 # created and returned with the initial response
-                thread: AzureAIAgentThread = None
+                thread: AzureAIAgentThread  = None
+                if request.thread_id:
+                    thread = AzureAIAgentThread(client=client, thread_id=request.thread_id) 
+
 
                 sources = []
 
@@ -90,19 +93,21 @@ class ChatAgentService:
                             sources.append(source)
                 
                 finally:
+                    print("Completed agent invocation")
                     # 5. Cleanup: Delete the thread and agent
-                    await thread.delete() if thread else None
+                    #await thread.delete() if thread else None
                     #await client.agents.delete_agent(agent.id) if agent else None   
 
             request_result = RequestResult(
                 content=f"{response}",
                 sources=sources,
-                intermediate_steps=intermediate_steps
+                intermediate_steps=intermediate_steps,
+                thread_id=thread.id
             )
 
             return request_result
         
-    async def run_chat_direct(self, request: ChatRequest) -> str:
+    async def run_chat_direct(self, request: ChatThreadRequest) -> str:
 
         project_client = AIProjectClient.from_connection_string(credential=DefaultAzureCredential(), conn_str=os.environ["AZURE_AI_AGENT_PROJECT_CONNECTION_STRING"],)
         tracer = trace.get_tracer(__name__)
