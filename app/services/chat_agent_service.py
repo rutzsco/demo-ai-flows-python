@@ -1,13 +1,11 @@
-import os
+import os, time
 from typing import List
-
-import semantic_kernel as sk
 from dotenv import load_dotenv
 from opentelemetry import trace
-
+from azure.ai.projects import AIProjectClient
 from app.models.api_models import ChatRequest, ExecutionDiagnostics, RequestResult, Source
 from app.prompts.file_service import FileService
-from app.services.weather_plugin import WeatherPlugin
+
 
 from semantic_kernel.agents import ChatCompletionAgent
 from semantic_kernel.connectors.ai.function_choice_behavior import FunctionChoiceBehavior
@@ -103,3 +101,34 @@ class ChatAgentService:
             )
 
             return request_result
+        
+    async def run_chat_direct(self, request: ChatRequest) -> str:
+
+        project_client = AIProjectClient.from_connection_string(credential=DefaultAzureCredential(), conn_str=os.environ["AZURE_AI_AGENT_PROJECT_CONNECTION_STRING"],)
+        tracer = trace.get_tracer(__name__)
+        with tracer.start_as_current_span("Agent: Chat") as current_span:
+            with project_client:
+
+                user_message = request.messages[-1].content
+                agent = project_client.agents.get_agent(agent_id='asst_g8KPAp9JzA8LpqJOIiwIisL8')
+                print(f"Created agent, agent ID: {agent.id}")
+                thread = project_client.agents.create_thread()
+                print(f"Created thread, thread ID: {thread.id}")
+                message = project_client.agents.create_message(thread_id=thread.id, role="user", content="Hello, tell me a hilarious joke")
+                print(f"Created message, message ID: {message.id}")
+
+                run = project_client.agents.create_run(thread_id=thread.id, agent_id=agent.id)
+
+                # Poll the run as long as run status is queued or in progress
+                while run.status in ["queued", "in_progress", "requires_action"]:
+                    # Wait for a second
+                    time.sleep(1)
+                    run = project_client.agents.get_run(thread_id=thread.id, run_id=run.id)
+
+                    print(f"Run status: {run.status}")
+
+                project_client.agents.delete_agent(agent.id)
+                print("Deleted agent")
+
+                messages = project_client.agents.list_messages(thread_id=thread.id)
+                print(f"messages: {messages}")

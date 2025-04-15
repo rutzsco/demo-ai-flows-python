@@ -45,3 +45,11 @@ async def run_weather_workflow(input_data: ChatRequest):
     """
     result = await chat_agent_service.run_chat(input_data)
     return {"result": result}
+
+@router.post("/agent/chat-direct")
+async def run_weather_workflow(input_data: ChatRequest):
+    """
+    POST endpoint for executing a weather workflow.
+    """
+    result = await chat_agent_service.run_chat_direct(input_data)
+    return {"result": result}
