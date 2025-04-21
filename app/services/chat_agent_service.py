@@ -14,7 +14,7 @@ from semantic_kernel.connectors.ai.prompt_execution_settings import PromptExecut
 from semantic_kernel.contents import AnnotationContent
 from semantic_kernel.contents.chat_history import ChatHistory
 from semantic_kernel.functions.kernel_arguments import KernelArguments
-from semantic_kernel.contents import  ChatMessageContent, FunctionCallContent
+from semantic_kernel.contents import ChatMessageContent, FunctionCallContent, StreamingChatMessageContent, StreamingAnnotationContent
 from azure.identity.aio import DefaultAzureCredential
 from semantic_kernel.agents import AzureAIAgent, AzureAIAgentSettings, AzureAIAgentThread
 
@@ -46,10 +46,15 @@ class ChatAgentService:
             user_message = request.message
 
             # Define a list to hold callback message content
-            intermediate_steps: list[ChatMessageContent] = []
+            intermediate_steps: list[str] = []
             async def handle_intermediate_steps(message: ChatMessageContent) -> None:
-                intermediate_steps.append(message)
-
+                print("handle_intermediate_steps")
+                if any(isinstance(item, FunctionCallContent) for item in message.items):
+                    for fcc in message.items:
+                        if isinstance(fcc, FunctionCallContent):
+                            intermediate_steps.append(f"Function Call: {fcc.name} with arguments: {fcc.arguments}")
+                else:
+                    print(f"{message.role}: {message.content}")
 
             async with (DefaultAzureCredential() as creds, AzureAIAgent.create_client(credential=creds) as client,):
                 
@@ -68,24 +73,29 @@ class ChatAgentService:
                 if request.thread_id:
                     thread = AzureAIAgentThread(client=client, thread_id=request.thread_id) 
 
-
+                annotations: list[StreamingAnnotationContent] = []
                 sources = []
-
+                responseContent = ''
                 try:
                     # 4. Invoke the agent with the specified message for response
-                    async for result in agent.invoke(messages=user_message, thread=thread, on_intermediate_message=handle_intermediate_steps):
+                    async for result in agent.invoke_stream(messages=user_message, thread=thread, on_intermediate_message=handle_intermediate_steps):
                         response = result
+                        annotations.extend([item for item in result.items if isinstance(item, StreamingAnnotationContent)])
+                        if isinstance(result.message, StreamingChatMessageContent):
+                            responseContent += result.message.content
+                        else:
+                            print(f"{result}")
+
                         thread = response.thread
                     
                     # Extract annotations from the ChatMessageContent response
-                    for item in response.items:
-                        if isinstance(item, AnnotationContent):
-                            source = Source(
-                                quote=item.quote if hasattr(item, 'quote') else '',
-                                title=item.title if hasattr(item, 'title') else '',
-                                url=item.url if hasattr(item, 'url') else ''
-                            )
-                            sources.append(source)
+                    for item in annotations:
+                        source = Source(
+                            quote=item.quote if hasattr(item, 'quote') else '',
+                            title=item.title if hasattr(item, 'title') else '',
+                            url=item.url if hasattr(item, 'url') else ''
+                        )
+                        sources.append(source)
                 
                 finally:
                     print("Completed agent invocation")
@@ -94,7 +104,7 @@ class ChatAgentService:
                     #await client.agents.delete_agent(agent.id) if agent else None   
 
             request_result = RequestResult(
-                content=f"{response}",
+                content=responseContent,
                 sources=sources,
                 intermediate_steps=intermediate_steps,
                 thread_id=thread.id
