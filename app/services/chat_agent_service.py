@@ -73,11 +73,6 @@ class ChatAgentService:
 
                 try:
                     # 4. Invoke the agent with the specified message for response
-                    #response = await agent.invoke(
-                    #    messages=user_message, 
-                    #    thread=thread
-                    #)
-                    #thread = response.thread
                     async for result in agent.invoke(messages=user_message, thread=thread, on_intermediate_message=handle_intermediate_steps):
                         response = result
                         thread = response.thread

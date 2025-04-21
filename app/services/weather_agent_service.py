@@ -5,7 +5,7 @@ import semantic_kernel as sk
 from dotenv import load_dotenv
 from opentelemetry import trace
 
-from app.models.api_models import ChatRequest, ExecutionDiagnostics, RequestResult
+from app.models.api_models import ChatRequest, ExecutionDiagnostics, RequestResult, ChatThreadRequest
 from app.prompts.file_service import FileService
 from app.services.weather_plugin import WeatherPlugin
 
@@ -79,7 +79,7 @@ class WeatherAgentService:
 
             return request_result
         
-    async def run_weather_agent(self, request: ChatRequest) -> str:
+    async def run_weather_agent(self, request: ChatThreadRequest) -> str:
 
         # Define a list to hold callback message content
         intermediate_steps: list[str] = []
@@ -90,21 +90,23 @@ class WeatherAgentService:
                 for fcc in message.items:
                   if isinstance(fcc, FunctionCallContent):
                       intermediate_steps.append(f"Function Call: {fcc.name} with arguments: {fcc.arguments}")
+            #else:
+                # Handle regular messages by capturing their content
+            #    intermediate_steps.append(f"Thinking: {message}")
 
         tracer = trace.get_tracer(__name__)
         with tracer.start_as_current_span("Agent: Weather") as current_span:
             # Validate the request object
-            if not request.messages:
+            if not request.message:
                 raise ValueError("No messages found in request.")
-            
+            user_message = request.message
+            system_message = self.file_service.read_file('WeatherSystemPrompt.txt')
+
             settings=PromptExecutionSettings(
                 function_choice_behavior=FunctionChoiceBehavior.Auto(filters={"included_plugins": ["weather"]}),
             )
             kernel_arguments = KernelArguments(settings=settings)
             kernel_arguments ["diagnostics"] = []
-
-            system_message = self.file_service.read_file('WeatherSystemPrompt.txt')
-            user_message = request.messages[-1].content
 
             agent = ChatCompletionAgent(
                 kernel=self.kernel, 
@@ -116,6 +118,7 @@ class WeatherAgentService:
             # Iterate over the async generator to get the final response
             response = None
             thread = None
+            
             async for result in agent.invoke(messages=user_message, thread=thread, on_intermediate_message=handle_intermediate_steps):
                 response = result
                 thread = response.thread

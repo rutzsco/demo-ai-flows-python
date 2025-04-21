@@ -31,7 +31,7 @@ async def run_weather_workflow(input_data: ChatRequest):
     return {"result": result}
 
 @router.post("/agent/weather")
-async def run_weather_workflow(input_data: ChatRequest):
+async def run_weather_workflow(input_data: ChatThreadRequest):
     """
     POST endpoint for executing a weather workflow.
     """
