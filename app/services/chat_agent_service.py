@@ -39,7 +39,7 @@ class ChatAgentService:
         pass
 
 
-    async def run_chat(self, request: ChatThreadRequest) -> str:
+    async def run_chat_sk(self, request: ChatThreadRequest) -> str:
         tracer = trace.get_tracer(__name__)
         with tracer.start_as_current_span("Agent: Chat") as current_span:
             # Validate the request object
