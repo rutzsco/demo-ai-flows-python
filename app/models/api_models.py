@@ -23,6 +23,7 @@ class RequestResult:
     execution_diagnostics: ExecutionDiagnostics = field(default_factory=ExecutionDiagnostics)
     intermediate_steps: list[str] = field(default_factory=list)
     sources: list[Source] = field(default_factory=list)
+    files: list[Source] = field(default_factory=list)
     thread_id: str = None
 
 @dataclass
@@ -37,4 +38,15 @@ class ChatRequest:
 @dataclass
 class ChatThreadRequest:
     message: str
-    thread_id: str
+    thread_id: str = None
+
+@dataclass
+class Source:
+    title: str
+    quote: str = None
+    url: str = None
+
+@dataclass
+class FileReference:
+    id: str
+    url: str = None

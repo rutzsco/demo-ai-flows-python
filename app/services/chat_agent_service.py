@@ -3,7 +3,7 @@ from typing import List
 from dotenv import load_dotenv
 from opentelemetry import trace
 from azure.ai.projects import AIProjectClient
-from app.models.api_models import ChatThreadRequest, ExecutionDiagnostics, RequestResult, Source
+from app.models.api_models import ChatThreadRequest, ExecutionDiagnostics, RequestResult, Source, FileReference
 from app.prompts.file_service import FileService
 
 
@@ -14,7 +14,7 @@ from semantic_kernel.connectors.ai.prompt_execution_settings import PromptExecut
 from semantic_kernel.contents import AnnotationContent
 from semantic_kernel.contents.chat_history import ChatHistory
 from semantic_kernel.functions.kernel_arguments import KernelArguments
-from semantic_kernel.contents import ChatMessageContent, FunctionCallContent, StreamingChatMessageContent, StreamingAnnotationContent
+from semantic_kernel.contents import ChatMessageContent, FunctionCallContent, StreamingChatMessageContent, StreamingAnnotationContent, StreamingFileReferenceContent
 from azure.identity.aio import DefaultAzureCredential
 from semantic_kernel.agents import AzureAIAgent, AzureAIAgentSettings, AzureAIAgentThread
 
@@ -33,6 +33,8 @@ class ChatAgentService:
     
         self.ai_agent_settings = AzureAIAgentSettings.create()
         self.file_service = FileService()
+
+        self.agent_id = os.getenv("AZURE_AI_AGENT_ID")
 
         pass
 
@@ -53,13 +55,15 @@ class ChatAgentService:
                     for fcc in message.items:
                         if isinstance(fcc, FunctionCallContent):
                             intermediate_steps.append(f"Function Call: {fcc.name} with arguments: {fcc.arguments}")
+                        else:
+                            print(f"{message.role}: {message.content}")
                 else:
                     print(f"{message.role}: {message.content}")
 
             async with (DefaultAzureCredential() as creds, AzureAIAgent.create_client(credential=creds) as client,):
                 
                 # 1. Create an agent on the Azure AI agent service
-                agent_definition = await client.agents.get_agent(agent_id='asst_g8KPAp9JzA8LpqJOIiwIisL8')
+                agent_definition = await client.agents.get_agent(agent_id=self.agent_id)
                 # 2. Create a Semantic Kernel agent for the Azure AI agent
                 agent = AzureAIAgent(
                     client=client,
@@ -74,13 +78,16 @@ class ChatAgentService:
                     thread = AzureAIAgentThread(client=client, thread_id=request.thread_id) 
 
                 annotations: list[StreamingAnnotationContent] = []
+                files: list[StreamingFileReferenceContent] = []
                 sources = []
+                file_references = []
                 responseContent = ''
                 try:
                     # 4. Invoke the agent with the specified message for response
                     async for result in agent.invoke_stream(messages=user_message, thread=thread, on_intermediate_message=handle_intermediate_steps):
                         response = result
                         annotations.extend([item for item in result.items if isinstance(item, StreamingAnnotationContent)])
+                        files.extend([item for item in result.items if isinstance(item, StreamingFileReferenceContent)])
                         if isinstance(result.message, StreamingChatMessageContent):
                             responseContent += result.message.content
                         else:
@@ -96,6 +103,12 @@ class ChatAgentService:
                             url=item.url if hasattr(item, 'url') else ''
                         )
                         sources.append(source)
+
+                    for item in files:
+                        fr = FileReference(
+                            id=item.file_id if hasattr(item, 'file_id') else ''
+                        )
+                        file_references.append(fr)
                 
                 finally:
                     print("Completed agent invocation")
@@ -106,6 +119,7 @@ class ChatAgentService:
             request_result = RequestResult(
                 content=responseContent,
                 sources=sources,
+                files=file_references,
                 intermediate_steps=intermediate_steps,
                 thread_id=thread.id
             )
