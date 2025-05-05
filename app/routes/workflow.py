@@ -4,7 +4,6 @@ from app.models.api_models import ChatRequest, ChatThreadRequest
 from app.services.sk import SemanticKernelService
 from app.services.weather_agent_service import WeatherAgentService
 from app.services.chat_agent_service import ChatAgentService
-from app.services.doc_service import DocService
 
 import asyncio
 router = APIRouter()
@@ -12,7 +11,6 @@ router = APIRouter()
 sk_service = SemanticKernelService()
 weather_service = WeatherAgentService()
 chat_agent_service = ChatAgentService()
-doc_service = DocService()
 
 class WorkflowInput(BaseModel):
     data: str
@@ -55,12 +53,4 @@ async def run_weather_workflow(input_data: ChatThreadRequest):
     POST endpoint for executing a weather workflow.
     """
     result = await chat_agent_service.run_chat_direct(input_data)
-    return {"result": result}
-
-@router.post("/agent/empty-doc")
-async def run_weather_workflow(input_data: ChatThreadRequest):
-    """
-    POST endpoint for executing a weather workflow.
-    """
-    result = await doc_service.run(input_data)
     return {"result": result}
