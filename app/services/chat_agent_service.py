@@ -6,6 +6,7 @@ from azure.ai.projects import AIProjectClient
 from app.models.api_models import ChatThreadRequest, ExecutionDiagnostics, RequestResult, Source, FileReference
 from app.prompts.file_service import FileService
 
+from azure.storage.blob import BlobServiceClient
 
 from semantic_kernel.agents import ChatCompletionAgent
 from semantic_kernel.connectors.ai.function_choice_behavior import FunctionChoiceBehavior
@@ -34,6 +35,9 @@ class ChatAgentService:
 
         self.agent_id = os.getenv("AZURE_AI_AGENT_ID")
 
+        blob_connection_string = os.getenv("AZURE_BLOB_CONNECTION_STRING")
+        self.blob_service_client = BlobServiceClient.from_connection_string(blob_connection_string)
+        
         pass
 
 
@@ -44,6 +48,21 @@ class ChatAgentService:
             if not request.message:
                 raise ValueError("No messages found in request.")
             user_message = request.message
+
+            # Check if a file was specified in the request
+            file_content = None
+            if request.file:
+                try:
+                    # Get the blob container name from environment variables
+                    blob_container_name = os.getenv("AZURE_BLOB_CONTAINER_NAME")
+                    blob_client = self.blob_service_client.get_blob_client(container=blob_container_name, blob=request.file)
+                    download_stream = blob_client.download_blob()
+                    file_content = download_stream.readall()
+                    print(f"Downloaded file '{request.file}' from blob storage")
+                    
+                except Exception as e:
+                    print(f"Error downloading file from blob storage: {e}")
+                    # Continue without the file if there's an error
 
             # Define a list to hold callback message content
             intermediate_steps: list[str] = []
@@ -76,7 +95,7 @@ class ChatAgentService:
                 file_references = []
                 responseContent = ''
                 try:
-                    # 4. Invoke the agent with the specified message for response
+                    # Invoke the agent with the specified message for response
                     async for result in agent.invoke_stream(messages=user_message, thread=thread, on_intermediate_message=handle_intermediate_steps):
                         response = result
                         annotations.extend([item for item in result.items if isinstance(item, StreamingAnnotationContent)])
@@ -194,7 +213,7 @@ class ChatAgentService:
                     print(f"Saved the file to: {file_name}") 
 
                     # save the newly created file
-                    from azure.storage.blob import BlobServiceClient
+                    
                     blob_connection_string = os.getenv("AZURE_BLOB_CONNECTION_STRING")
                     blob_container_name = os.getenv("AZURE_BLOB_CONTAINER_NAME")
                     if not blob_connection_string or not blob_container_name:

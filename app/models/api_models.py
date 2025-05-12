@@ -38,6 +38,7 @@ class ChatRequest:
 @dataclass
 class ChatThreadRequest:
     message: str
+    file: str = None
     thread_id: str = None
 
 @dataclass
