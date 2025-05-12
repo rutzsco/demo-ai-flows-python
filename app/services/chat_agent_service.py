@@ -34,10 +34,10 @@ class ChatAgentService:
         load_dotenv()
 
         self.agent_id = os.getenv("AZURE_AI_AGENT_ID")
-
         blob_connection_string = os.getenv("AZURE_BLOB_CONNECTION_STRING")
-        self.blob_service_client = BlobServiceClient.from_connection_string(blob_connection_string)
-        
+        self.blob_service_client = None
+        if blob_connection_string:
+            self.blob_service_client = BlobServiceClient.from_connection_string(blob_connection_string)
         pass
 
 
@@ -51,6 +51,8 @@ class ChatAgentService:
 
             # Check if a file was specified in the request
             file_content = None
+            ai_project_file = None
+            temp_file_path = None
             if request.file:
                 try:
                     # Get the blob container name from environment variables
@@ -60,9 +62,23 @@ class ChatAgentService:
                     file_content = download_stream.readall()
                     print(f"Downloaded file '{request.file}' from blob storage")
                     
+                    # Create a temporary file to upload to AI Project service
+                    temp_file_path = f"./temp_{uuid.uuid4()}{os.path.splitext(request.file)[1]}"
+                    with open(temp_file_path, "wb") as f:
+                        f.write(file_content)
+                    
+                    # Create an AI Project client and upload the file
+                    project_client = AIProjectClient.from_connection_string(credential=DefaultAzureCredential(), conn_str=os.environ["AZURE_AI_AGENT_PROJECT_CONNECTION_STRING"])
+                    ai_project_file = project_client.agents.upload_file_and_poll(file_path=temp_file_path, purpose=FilePurpose.AGENTS)
+                    print(f"Uploaded file to AI Project service with ID: {ai_project_file.id}")
+                    
                 except Exception as e:
-                    print(f"Error downloading file from blob storage: {e}")
+                    print(f"Error processing file: {e}")
                     # Continue without the file if there's an error
+                finally:
+                    # Clean up the temporary file if it was created
+                    if temp_file_path and os.path.exists(temp_file_path):
+                        os.remove(temp_file_path)
 
             # Define a list to hold callback message content
             intermediate_steps: list[str] = []
@@ -95,7 +111,6 @@ class ChatAgentService:
                 file_references = []
                 responseContent = ''
                 try:
-                    # Invoke the agent with the specified message for response
                     async for result in agent.invoke_stream(messages=user_message, thread=thread, on_intermediate_message=handle_intermediate_steps):
                         response = result
                         annotations.extend([item for item in result.items if isinstance(item, StreamingAnnotationContent)])
@@ -242,4 +257,3 @@ class ChatAgentService:
                 finally:
                     project_client.agents.delete_thread(thread.id)
                     project_client.agents.delete_agent(agent.id)
-                    
