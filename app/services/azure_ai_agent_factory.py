@@ -23,11 +23,7 @@ class AzureAIAgentFactory:
 
             creds = DefaultAzureCredential()
             async with (AzureAIAgent.create_client(credential=creds) as client,):
-                agent_definition = await client.agents.create_agent(
-                    model=request.model,
-                    name=request.name,
-                    instructions=request.instructions,
-                )
+                agent_definition = await client.agents.create_agent(model=request.model, name=request.name, instructions=request.instructions)
                 
             return agent_definition
 
