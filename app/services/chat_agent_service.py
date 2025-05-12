@@ -32,17 +32,6 @@ class ChatAgentService:
         # Load environment variables from .env file
         load_dotenv()
 
-        # Retrieve configuration from environment variables
-        api_key = os.getenv("AZURE_OPENAI_API_KEY")
-        endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
-        deployment_name = os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT_NAME")
-        
-        if not api_key or not endpoint or not deployment_name:
-            raise ValueError("Missing required environment variables for OpenAI configuration.")
-    
-        self.ai_agent_settings = AzureAIAgentSettings.create()
-        self.file_service = FileService()
-
         self.agent_id = os.getenv("AZURE_AI_AGENT_ID")
 
         pass
@@ -72,17 +61,11 @@ class ChatAgentService:
             creds = DefaultAzureCredential()
             async with (AzureAIAgent.create_client(credential=creds) as client,):
                 
-                # 1. Create an agent on the Azure AI agent service
+                # Create an agent on the Azure AI agent service. Create a Semantic Kernel agent for the Azure AI agent
                 agent_definition = await client.agents.get_agent(agent_id=self.agent_id)
-                # 2. Create a Semantic Kernel agent for the Azure AI agent
-                agent = AzureAIAgent(
-                    client=client,
-                    definition=agent_definition,
-                )
+                agent = AzureAIAgent(client=client, definition=agent_definition)
 
-                # 3. Create a thread for the agent
-                # If no thread is provided, a new thread will be
-                # created and returned with the initial response
+                # Create a thread for the agent. If no thread is provided, a new thread will be created and returned with the initial response
                 thread: AzureAIAgentThread  = None
                 if request.thread_id:
                     thread = AzureAIAgentThread(client=client, thread_id=request.thread_id) 
@@ -121,10 +104,7 @@ class ChatAgentService:
                         file_references.append(fr)
                 
                 finally:
-                    print("Completed agent invocation")
-                    # 5. Cleanup: Delete the thread and agent
-                    #await thread.delete() if thread else None
-                    #await client.agents.delete_agent(agent.id) if agent else None   
+                    print("Completed agent invocation")  
 
             request_result = RequestResult(
                 content=responseContent,
