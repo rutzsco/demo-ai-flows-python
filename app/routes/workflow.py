@@ -1,16 +1,17 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
-from app.models.api_models import ChatRequest, ChatThreadRequest
+from app.models.api_models import ChatRequest, ChatThreadRequest, AgentCreateRequest
 from app.services.sk import SemanticKernelService
 from app.services.weather_agent_service import WeatherAgentService
 from app.services.chat_agent_service import ChatAgentService
-
+from app.services.azure_ai_agent_factory import AzureAIAgentFactory
 import asyncio
 router = APIRouter()
 
 sk_service = SemanticKernelService()
 weather_service = WeatherAgentService()
 chat_agent_service = ChatAgentService()
+azure_ai_agent_factory = AzureAIAgentFactory()
 
 class WorkflowInput(BaseModel):
     data: str
@@ -53,4 +54,12 @@ async def run_weather_workflow(input_data: ChatThreadRequest):
     POST endpoint for executing a weather workflow.
     """
     result = await chat_agent_service.run_chat_direct(input_data)
+    return {"result": result}
+
+@router.post("/agent/chat/create")
+async def run_weather_workflow(input_data: AgentCreateRequest):
+    """
+    POST endpoint for executing a weather workflow.
+    """
+    result = await azure_ai_agent_factory.run_create_azure_ai_agent(input_data)
     return {"result": result}

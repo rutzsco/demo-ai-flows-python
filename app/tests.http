@@ -52,3 +52,13 @@ Content-Type: application/json
   "message": "What is the weather in mankato MN",
   "thread_id": ""
 }
+
+### Create Azure AI Agent
+POST {{baseUrl}}/agent/chat/create
+Content-Type: application/json
+
+{
+  "instructions": "You are a helpful assistant",
+  "name": "ChatAssistantV2",
+  "model": "gpt-4.1"
+}

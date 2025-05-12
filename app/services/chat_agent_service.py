@@ -69,7 +69,8 @@ class ChatAgentService:
                 else:
                     print(f"{message.role}: {message.content}")
 
-            async with (DefaultAzureCredential() as creds, AzureAIAgent.create_client(credential=creds) as client,):
+            creds = DefaultAzureCredential()
+            async with (AzureAIAgent.create_client(credential=creds) as client,):
                 
                 # 1. Create an agent on the Azure AI agent service
                 agent_definition = await client.agents.get_agent(agent_id=self.agent_id)

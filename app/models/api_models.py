@@ -50,3 +50,9 @@ class Source:
 class FileReference:
     id: str
     url: str = None
+
+@dataclass
+class AgentCreateRequest:
+    instructions: str
+    name: str
+    model: str
