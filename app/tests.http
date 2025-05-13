@@ -44,6 +44,24 @@ Content-Type: application/json
   "thread_id": ""
 }
 
+### Demo - chat-docs
+POST {{baseUrl}}/agent/chat-docs
+Content-Type: application/json
+
+{
+  "files": [
+    {
+      "file_name": "ToyotaCorolla.pdf",
+      "file_type": "application/pdf"
+    },
+    {
+      "file_name": "HondaCivic.pdf",
+      "file_type": "application/pdf"
+    }
+  ],
+  "query": "Between Toyota Corolla and Honda Civic, please analyze and compare:  Price: The initial cost of the car and its overall value for money. This includes considering any financing options, discounts, and the long-term cost of ownership.  Fuel Efficiency: How economical the car is in terms of fuel consumption. This is especially important for those looking to save on fuel costs and reduce their environmental impact.  Safety Features: The availability and effectiveness of safety features like airbags, anti-lock braking systems (ABS), and crash test ratings. Ensuring the car has robust safety measures is crucial for protecting passengers.  Finally give me a purchase suggestion."
+}
+
 ### Demo - Chat Weather 
 POST {{baseUrl}}/agent/chat
 Content-Type: application/json
