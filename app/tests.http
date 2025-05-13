@@ -62,3 +62,13 @@ Content-Type: application/json
   "name": "ChatAssistantV2",
   "model": "gpt-4.1"
 }
+
+### Demo - Chat File
+POST {{baseUrl}}/agent/chat
+Content-Type: application/json
+
+{
+  "message": "What is the weather in mankato MN",
+  "file" : "2019-Ford-Ranger-Owners-Manual.pdf",
+  "thread_id": ""
+}
