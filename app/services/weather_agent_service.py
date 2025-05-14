@@ -4,6 +4,7 @@ from typing import List
 import semantic_kernel as sk
 from dotenv import load_dotenv
 from opentelemetry import trace
+from azure.identity import DefaultAzureCredential
 
 from app.models.api_models import ChatRequest, ExecutionDiagnostics, RequestResult, ChatThreadRequest
 from app.prompts.file_service import FileService
@@ -16,7 +17,9 @@ from semantic_kernel.connectors.ai.prompt_execution_settings import PromptExecut
 from semantic_kernel.contents import ChatMessageContent
 from semantic_kernel.contents.chat_history import ChatHistory
 from semantic_kernel.functions.kernel_arguments import KernelArguments
-from semantic_kernel.contents import  ChatMessageContent, FunctionCallContent
+from semantic_kernel.contents import ChatMessageContent, FunctionCallContent
+from semantic_kernel.connectors.ai.azure_ai_inference import AzureAIInferenceChatCompletion
+from azure.ai.inference.aio import ChatCompletionsClient
 
 class WeatherAgentService:
     def __init__(self):
@@ -28,16 +31,30 @@ class WeatherAgentService:
         endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
         deployment_name = os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT_NAME")
         
-        if not api_key or not endpoint or not deployment_name:
+        if not endpoint or not deployment_name:
             raise ValueError("Missing required environment variables for OpenAI configuration.")
     
         self.kernel = sk.Kernel()
-        self.kernel.add_service(AzureChatCompletion(
-            api_key=api_key,
-            endpoint=endpoint,
-            deployment_name=deployment_name,
-            service_id="azure-chat-completion"
-        ))
+        
+        # If API key is present, use key-based authentication
+        if api_key:
+            self.kernel.add_service(AzureChatCompletion(
+                api_key=api_key,
+                endpoint=endpoint,
+                deployment_name=deployment_name,
+                service_id="azure-chat-completion"
+            ))
+        # Otherwise use DefaultAzureCredential
+        else:
+            self.kernel.add_service(AzureAIInferenceChatCompletion(
+                ai_model_id=deployment_name,
+                client=ChatCompletionsClient(
+                     endpoint=f"{str(endpoint).strip('/')}/openai/deployments/{deployment_name}",
+                     credential=DefaultAzureCredential(),
+                     credential_scopes=["https://cognitiveservices.azure.com/.default"],
+                )
+            ))
+
         self.kernel.add_plugin(WeatherPlugin(self.kernel), plugin_name="weather")
         self.file_service = FileService()
 
