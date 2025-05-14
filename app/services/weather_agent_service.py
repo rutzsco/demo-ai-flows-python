@@ -90,9 +90,6 @@ class WeatherAgentService:
                 for fcc in message.items:
                   if isinstance(fcc, FunctionCallContent):
                       intermediate_steps.append(f"Function Call: {fcc.name} with arguments: {fcc.arguments}")
-            #else:
-                # Handle regular messages by capturing their content
-            #    intermediate_steps.append(f"Thinking: {message}")
 
         tracer = trace.get_tracer(__name__)
         with tracer.start_as_current_span("Agent: Weather") as current_span:

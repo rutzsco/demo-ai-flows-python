@@ -16,7 +16,7 @@ from semantic_kernel.connectors.ai.prompt_execution_settings import PromptExecut
 from semantic_kernel.contents import AnnotationContent
 from semantic_kernel.contents.chat_history import ChatHistory
 from semantic_kernel.functions.kernel_arguments import KernelArguments
-from semantic_kernel.contents import ChatMessageContent, FunctionCallContent, StreamingChatMessageContent, StreamingAnnotationContent, StreamingFileReferenceContent
+from semantic_kernel.contents import ChatMessageContent, FunctionCallContent, StreamingChatMessageContent, StreamingAnnotationContent, StreamingFileReferenceContent, ImageContent, FileReferenceContent
 from azure.identity.aio import DefaultAzureCredential
 from semantic_kernel.agents import AzureAIAgent, AzureAIAgentSettings, AzureAIAgentThread
 
@@ -28,6 +28,8 @@ from azure.identity import DefaultAzureCredential
 from pathlib import Path
 import json
 import uuid  # Import the uuid module
+from semantic_kernel.contents.utils.author_role import AuthorRole
+from app.utils.file_utils import download_and_process_file, create_chat_message_content
 
 class ChatAgentService:
     def __init__(self):
@@ -41,7 +43,6 @@ class ChatAgentService:
             self.blob_service_client = BlobServiceClient.from_connection_string(blob_connection_string)
         pass
 
-
     async def run_chat_sk(self, request: ChatThreadRequest) -> str:
         tracer = trace.get_tracer(__name__)
         with tracer.start_as_current_span("Agent: Chat") as current_span:
@@ -53,33 +54,8 @@ class ChatAgentService:
             # Check if a file was specified in the request
             file_content = None
             ai_project_file = None
-            temp_file_path = None
-            if request.file:
-                try:
-                    # Get the blob container name from environment variables
-                    blob_container_name = os.getenv("AZURE_BLOB_CONTAINER_NAME")
-                    blob_client = self.blob_service_client.get_blob_client(container=blob_container_name, blob=request.file)
-                    download_stream = blob_client.download_blob()
-                    file_content = download_stream.readall()
-                    print(f"Downloaded file '{request.file}' from blob storage")
-                    
-                    # Create a temporary file to upload to AI Project service
-                    temp_file_path = f"./temp_{uuid.uuid4()}{os.path.splitext(request.file)[1]}"
-                    with open(temp_file_path, "wb") as f:
-                        f.write(file_content)
-                    
-                    # Create an AI Project client and upload the file
-                    project_client = AIProjectClient.from_connection_string(credential=DefaultAzureCredential(), conn_str=os.environ["AZURE_AI_AGENT_PROJECT_CONNECTION_STRING"])
-                    ai_project_file = project_client.agents.upload_file_and_poll(file_path=temp_file_path, purpose=FilePurpose.AGENTS)
-                    print(f"Uploaded file to AI Project service with ID: {ai_project_file.id}")
-                    
-                except Exception as e:
-                    print(f"Error processing file: {e}")
-                    # Continue without the file if there's an error
-                finally:
-                    # Clean up the temporary file if it was created
-                    if temp_file_path and os.path.exists(temp_file_path):
-                        os.remove(temp_file_path)
+            if request.file and self.blob_service_client:
+                file_content, ai_project_file = await download_and_process_file(self.blob_service_client, request.file)
 
             # Define a list to hold callback message content
             intermediate_steps: list[str] = []
@@ -112,7 +88,15 @@ class ChatAgentService:
                 file_references = []
                 responseContent = ''
                 try:
-                    async for result in agent.invoke_stream(messages=user_message, thread=thread, on_intermediate_message=handle_intermediate_steps):
+                    # Create the appropriate ChatMessageContent based on whether we have a file
+                    cmc = create_chat_message_content(
+                        user_message=user_message, 
+                        file_content=file_content, 
+                        file_name=request.file, 
+                        ai_project_file=ai_project_file
+                    )
+                    
+                    async for result in agent.invoke_stream(messages=cmc, thread=thread, on_intermediate_message=handle_intermediate_steps):
                         response = result
                         annotations.extend([item for item in result.items if isinstance(item, StreamingAnnotationContent)])
                         files.extend([item for item in result.items if isinstance(item, StreamingFileReferenceContent)])

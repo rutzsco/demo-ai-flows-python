@@ -18,12 +18,8 @@ POST {{baseUrl}}/agent/weather
 Content-Type: application/json
 
 {
-  "messages": [
-    {
-      "role": "User",
-      "content": "What is the weather in mankato MN"
-    }
-  ]
+  "message": "What is the weather in mankato MN",
+  "thread_id": ""
 }
 
 ### Demo - Chat  
@@ -88,5 +84,15 @@ Content-Type: application/json
 {
   "message": "What is the weather in mankato MN",
   "file" : "2019-Ford-Ranger-Owners-Manual.pdf",
+  "thread_id": ""
+}
+
+### Demo - Chat File
+POST {{baseUrl}}/agent/chat
+Content-Type: application/json
+
+{
+  "message": "Plesse describe the damage to the car",
+  "file" : "car1.jpg",
   "thread_id": ""
 }
