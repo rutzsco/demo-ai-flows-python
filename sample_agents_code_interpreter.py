@@ -36,7 +36,7 @@ asset_file_path = os.path.abspath(
 print(f"Using asset file: {asset_file_path}")
 
 agents_client = AgentsClient(
-    endpoint="https://xjxfoundry.services.ai.azure.com/api/projects/firstProject",
+    endpoint=os.getenv("AZURE_AI_AGENT_PROJECT_ENDPOINT"),
     credential=DefaultAzureCredential(),
 )
 print(f"agents_client: {agents_client}")

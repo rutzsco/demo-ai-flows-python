@@ -13,14 +13,15 @@ import os
 import uuid
 router = APIRouter()
 
-sk_service = SemanticKernelService()
-weather_service = WeatherAgentService()
+#sk_service = SemanticKernelService()
+#weather_service = WeatherAgentService()
 chat_agent_service = ChatAgentService()
 # azure_ai_agent_factory = AzureAIAgentFactory()
 
 class WorkflowInput(BaseModel):
     data: str
 
+'''
 @router.post("/workflow")
 async def run_workflow(input_data: WorkflowInput):
     """
@@ -36,7 +37,7 @@ async def run_weather_workflow(input_data: ChatRequest):
     """
     result = await weather_service.run_weather(input_data)
     return {"result": result}
-
+'''
 @router.post("/agent/weather")
 async def run_weather_workflow(input_data: ChatThreadRequest):
     """
