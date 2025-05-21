@@ -1,6 +1,6 @@
 import shutil
 import os, time
-from typing import List
+from typing import List, Optional, Any
 from dotenv import load_dotenv
 from opentelemetry import trace
 from azure.ai.projects import AIProjectClient
@@ -18,17 +18,59 @@ from semantic_kernel.contents.chat_history import ChatHistory
 from semantic_kernel.functions.kernel_arguments import KernelArguments
 from semantic_kernel.contents import ChatMessageContent, FunctionCallContent, StreamingChatMessageContent, StreamingAnnotationContent, StreamingFileReferenceContent
 from azure.identity.aio import DefaultAzureCredential
-from semantic_kernel.agents import AzureAIAgent, AzureAIAgentSettings, AzureAIAgentThread
+#from semantic_kernel.agents import AzureAIAgent, AzureAIAgentSettings, AzureAIAgentThread
 
-from azure.ai.projects import AIProjectClient
-from azure.ai.projects.models import CodeInterpreterTool
-from azure.ai.projects.models import FilePurpose
-from azure.ai.projects.models import MessageRole, BingGroundingTool, FileSearchTool
+from azure.ai.agents import AgentsClient
+from azure.ai.agents.models import (
+    CodeInterpreterTool,
+    FileSearchTool,
+    FilePurpose,
+    ListSortOrder,
+    MessageRole,
+    BingGroundingTool,
+    FunctionTool, 
+    ToolSet,
+    MessageAttachment,
+    MessageTextContent,
+    AsyncAgentEventHandler,
+    MessageDeltaChunk,
+    ThreadMessage,
+    ThreadRun,
+    RunStep,
+
+)
 from azure.identity import DefaultAzureCredential
+from azure.identity.aio import DefaultAzureCredential as AsyncDefaultAzureCredential
 from pathlib import Path
 import json
 import uuid  # Import the uuid module
 
+import asyncio
+from azure.ai.agents.aio import AgentsClient as AsyncAgentsClient
+
+class MyEventHandler(AsyncAgentEventHandler[str]):
+
+    async def on_message_delta(self, delta: "MessageDeltaChunk") -> Optional[str]:
+        return f"Text delta received: {delta.text}"
+
+    async def on_thread_message(self, message: "ThreadMessage") -> Optional[str]:
+        return f"ThreadMessage created. ID: {message.id}, Status: {message.status}"
+
+    async def on_thread_run(self, run: "ThreadRun") -> Optional[str]:
+        return f"ThreadRun status: {run.status}"
+
+    async def on_run_step(self, step: "RunStep") -> Optional[str]:
+        return f"RunStep type: {step.type}, Status: {step.status}"
+
+    async def on_error(self, data: str) -> Optional[str]:
+        return f"An error occurred. Data: {data}"
+
+    async def on_done(self) -> Optional[str]:
+        return "Stream completed."
+
+    async def on_unhandled_event(self, event_type: str, event_data: Any) -> Optional[str]:
+        return f"Unhandled Event Type: {event_type}, Data: {event_data}"
+    
 class ChatAgentService:
     def __init__(self):
         # Load environment variables from .env file
@@ -43,8 +85,9 @@ class ChatAgentService:
 
 
     async def run_chat_sk(self, request: ChatThreadRequest) -> str:
+
         tracer = trace.get_tracer(__name__)
-        with tracer.start_as_current_span("Agent: Chat") as current_span:
+        with tracer.start_as_current_span("Agent: run_chat_sk") as current_span:
             # Validate the request object
             if not request.message:
                 raise ValueError("No messages found in request.")
@@ -68,106 +111,139 @@ class ChatAgentService:
                     with open(temp_file_path, "wb") as f:
                         f.write(file_content)
                     
-                    # Create an AI Project client and upload the file
-                    project_client = AIProjectClient.from_connection_string(credential=DefaultAzureCredential(), conn_str=os.environ["AZURE_AI_AGENT_PROJECT_CONNECTION_STRING"])
-                    ai_project_file = project_client.agents.upload_file_and_poll(file_path=temp_file_path, purpose=FilePurpose.AGENTS)
-                    print(f"Uploaded file to AI Project service with ID: {ai_project_file.id}")
-                    
                 except Exception as e:
                     print(f"Error processing file: {e}")
-                    # Continue without the file if there's an error
-                finally:
+                    raise e
+                
+            # Create an Azure AI agent client
+            async with AsyncDefaultAzureCredential() as creds:
+                async with AsyncAgentsClient(
+                    endpoint=os.environ["AZURE_AI_AGENT_PROJECT_ENDPOINT"],
+                    credential=creds,
+                ) as agents_client:
+                    file = await agents_client.files.upload_and_poll(file_path=temp_file_path, purpose=FilePurpose.AGENTS)
+                    print(f"Uploaded file to AI Project service.")
+                    
                     # Clean up the temporary file if it was created
                     if temp_file_path and os.path.exists(temp_file_path):
                         os.remove(temp_file_path)
-
-            # Define a list to hold callback message content
-            intermediate_steps: list[str] = []
-            async def handle_intermediate_steps(message: ChatMessageContent) -> None:
-                print("handle_intermediate_steps")
-                if any(isinstance(item, FunctionCallContent) for item in message.items):
-                    for fcc in message.items:
-                        if isinstance(fcc, FunctionCallContent):
-                            intermediate_steps.append(f"Function Call: {fcc.name} with arguments: {fcc.arguments}")
-                        else:
-                            print(f"{message.role}: {message.content}")
-                else:
-                    print(f"{message.role}: {message.content}")
-
-            creds = DefaultAzureCredential()
-            async with (AzureAIAgent.create_client(credential=creds) as client,):
-                
-                # Create an agent on the Azure AI agent service. Create a Semantic Kernel agent for the Azure AI agent
-                agent_definition = await client.agents.get_agent(agent_id=self.agent_id)
-                agent = AzureAIAgent(client=client, definition=agent_definition)
-
-                # Create a thread for the agent. If no thread is provided, a new thread will be created and returned with the initial response
-                thread: AzureAIAgentThread  = None
-                if request.thread_id:
-                    thread = AzureAIAgentThread(client=client, thread_id=request.thread_id) 
-
-                annotations: list[StreamingAnnotationContent] = []
-                files: list[StreamingFileReferenceContent] = []
-                sources = []
-                file_references = []
-                responseContent = ''
-                try:
-                    async for result in agent.invoke_stream(messages=user_message, thread=thread, on_intermediate_message=handle_intermediate_steps):
-                        response = result
-                        annotations.extend([item for item in result.items if isinstance(item, StreamingAnnotationContent)])
-                        files.extend([item for item in result.items if isinstance(item, StreamingFileReferenceContent)])
-                        if isinstance(result.message, StreamingChatMessageContent):
-                            responseContent += result.message.content
-                        else:
-                            print(f"{result}")
-
-                        thread = response.thread
                     
-                    # Extract annotations from the ChatMessageContent response
-                    for item in annotations:
-                        source = Source(
-                            quote=item.quote if hasattr(item, 'quote') else '',
-                            title=item.title if hasattr(item, 'title') else '',
-                            url=item.url if hasattr(item, 'url') else ''
-                        )
-                        sources.append(source)
-
-                    for item in files:
-                        fr = FileReference(
-                            id=item.file_id if hasattr(item, 'file_id') else ''
-                        )
-                        file_references.append(fr)
+                    code_interpreter = CodeInterpreterTool()
+                    print(f"Code interpreter tool: {code_interpreter}")
+                    
+                    # Create agent
+                    agent_name="agent_run_chat_sk"
+                    agent = await agents_client.create_agent(
+                        model=os.environ["MODEL_DEPLOYMENT_NAME"],
+                        name=agent_name,
+                        instructions="You are helpful agent",
+                        tools=code_interpreter.definitions,
+                        tool_resources=code_interpreter.resources,
+                    )
+                    print(f"Created agent, agent ID: {agent.id}")
                 
-                finally:
-                    print("Completed agent invocation")  
+                    thread = await agents_client.threads.create()
+                    print(f"Created thread, thread ID: {thread.id}")
+                    
+                    # Create a message with the file search attachment
+                    attachment = MessageAttachment(file_id=file.id, tools=FileSearchTool().definitions)
+                    message = await agents_client.messages.create(
+                        thread_id=thread.id,
+                        role="user",
+                        content=user_message,
+                        attachments=[attachment],
+                    )
+                    print(f"Created message, message ID: {message.id}")
+                    
+                    async with await agents_client.runs.stream(
+                        thread_id=thread.id, agent_id=agent.id, event_handler=MyEventHandler()
+                    ) as stream:
+                        async for event_type, event_data, func_return in stream:
+                            print(f"Received data.")
+                            print(f"Streaming receive Event Type: {event_type}")
+                            print(f"Event Data: {str(event_data)[:100]}...")
+                            print(f"Event Function return: {func_return}\n")
 
-            request_result = RequestResult(
-                content=responseContent,
-                sources=sources,
-                files=file_references,
-                intermediate_steps=intermediate_steps,
-                thread_id=thread.id
-            )
+                    await agents_client.delete_agent(agent.id)
+                    print("Deleted agent")
+                    
+                    # Get the last message from the agent
+                    last_msg=""
+                    file_urls = []
+                    messages = agents_client.messages.list(thread_id=thread.id, order=ListSortOrder.ASCENDING)
+                    async for msg in messages:
+                        print(f"{msg.role}: {msg.content}")
+                        for ann in msg.file_path_annotations:
+                            print("File Paths:")
+                            print(f"  Type: {ann.type}")
+                            print(f"  Text: {ann.text}")
+                            print(f"  File ID: {ann.file_path.file_id}")
+                            print(f"  Start Index: {ann.start_index}")
+                            print(f"  End Index: {ann.end_index}")
+                        
+                            filename=os.path.basename(ann.text)
+                            #file_name = str(uuid.uuid4()) + extension  # Convert UUID to string
+                            file_id = ann.file_path.file_id
+                            print(f"File name: {filename}, File ID: {file_id}")
+                            
+                            await agents_client.files.save(file_id=file_id, file_name=filename)
+                            print(f"Saved the file to: {filename}") 
+                            
+                            # save the newly created file to blob storage
+                            blob_connection_string = os.getenv("AZURE_BLOB_CONNECTION_STRING")
+                            blob_container_name = os.getenv("AZURE_BLOB_CONTAINER_NAME")
+                            if not blob_connection_string or not blob_container_name:
+                                raise ValueError("Missing required environment variables for Azure Blob Storage.")
 
-            return request_result
-    
+                            blob_service_client = BlobServiceClient.from_connection_string(blob_connection_string)
+                            blob_client = blob_service_client.get_blob_client(container=blob_container_name, blob=filename)
+                            with open(filename, "rb") as data:
+                                blob_client.upload_blob(data, overwrite=True)
+                                
+                            # Clean up the temporary file if it was created
+                            if filename and os.path.exists(filename):
+                                os.remove(filename)
+                                
+                            # Get the full URL of the uploaded file
+                            file_urls.append({"name": filename, "url": blob_client.url})
+                            
+                        if msg.role == MessageRole.AGENT:
+                            last_part = msg.content[-1]
+                            if isinstance(last_part, MessageTextContent):
+                                print(f"{msg.role}: {last_part.text.value}")
+                                last_msg =last_part.text.value
+                                
+                    # Clean up the temporary file if it was created
+                    if temp_file_path and os.path.exists(temp_file_path):
+                        os.remove(temp_file_path)
+                    if filename and os.path.exists(filename):
+                        os.remove(filename)
+                                        
+                    if len(file_urls)>0:
+                        file_url = ', '.join([f"[{file['name']}]({file['url']})" for file in file_urls])
+                        return(f"{last_msg} \nBlob copy: {file_url}")
+                    else:
+                        return(f"{last_msg}")
+
     async def run_chat_direct(self, request: ChatThreadRequest) -> str:
-
-        project_client = AIProjectClient.from_connection_string(credential=DefaultAzureCredential(), conn_str=os.environ["AZURE_AI_AGENT_PROJECT_CONNECTION_STRING"],)
-        print(f"Created project client, project ID: {project_client}")
+        agent_name="agent_run_chat_direct"
+        agents_client = AgentsClient(credential=DefaultAzureCredential(), endpoint=os.environ["AZURE_AI_AGENT_PROJECT_ENDPOINT"])
+        print(f"Created project client, project ID: {agents_client}")
+        
         tracer = trace.get_tracer(__name__)
-        with tracer.start_as_current_span("Agent: Chat") as current_span:
-            with project_client:
+        with tracer.start_as_current_span("Agent: run_chat_direct") as current_span:
+            with agents_client:
                 try:
                     user_message = request.message + " Save the result to a file."
                     print(f"User message: {user_message}")
                     
                     code_interpreter = CodeInterpreterTool()
+                    print(f"Code interpreter tool: {code_interpreter}")
                     
                     # create agent with code interpreter tool and tools_resources
-                    agent = project_client.agents.create_agent(
+                    agent = agents_client.create_agent(
                         model=os.environ["AZURE_AI_AGENT_MODEL_DEPLOYMENT_NAME"],
-                        name="agent_run_chat_direct",
+                        name=agent_name,
                         instructions="You are helpful agent.",
                         tools=code_interpreter.definitions,
                         tool_resources=code_interpreter.resources,
@@ -175,11 +251,11 @@ class ChatAgentService:
                     print(f"Created agent, agent ID: {agent.id}")
 
                     # create a thread
-                    thread = project_client.agents.create_thread()
+                    thread = agents_client.threads.create()
                     print(f"Created thread, thread ID: {thread.id}")
 
                     # create a message
-                    message = project_client.agents.create_message(
+                    message = agents_client.messages.create(    
                         thread_id=thread.id,
                         role="user",
                         content=user_message,
@@ -187,72 +263,67 @@ class ChatAgentService:
                     print(f"Created message, message ID: {message.id}")
 
                     # create and execute a run
-                    run = project_client.agents.create_and_process_run(thread_id=thread.id, agent_id=agent.id)
+                    run = agents_client.runs.create_and_process(thread_id=thread.id, agent_id=agent.id)
                     print(f"Run finished with status: {run.status}")
 
                     if run.status == "failed":
                         # Check if you got "Rate limit is exceeded.", then you want to get more quota
                         print(f"Run failed: {run.last_error}")
                         return f"Run failed: {run.last_error}"
-
-                    # print the messages from the agent
-                    messages = project_client.agents.list_messages(thread_id=thread.id)
-                    print(f"Messages: {messages}")
                     
-                    # get the most recent message from the assistant
-                    last_msg = messages.get_last_text_message_by_role("assistant")
+                    # get messages
+                    messages = agents_client.messages.list(thread_id=thread.id)
+                    print(f"Messages: {messages}")
+    
+                    file_urls = []
+                    for msg in messages:
+                        # Print details of every file-path annotation
+                        for ann in msg.file_path_annotations:
+                            print("File Paths:")
+                            print(f"  Type: {ann.type}")
+                            print(f"  Text: {ann.text}")
+                            print(f"  File ID: {ann.file_path.file_id}")
+                            print(f"  Start Index: {ann.start_index}")
+                            print(f"  End Index: {ann.end_index}")
+                            
+                            filename=os.path.basename(ann.text)
+                            #file_name = str(uuid.uuid4()) + extension  # Convert UUID to string
+                            file_id = ann.file_path.file_id
+                            print(f"File name: {filename}, File ID: {file_id}")
+                            
+                            agents_client.files.save(file_id=file_id, file_name=filename)
+                            print(f"Saved the file to: {filename}") 
+                            
+                            # save the newly created file to blob storage
+                            blob_connection_string = os.getenv("AZURE_BLOB_CONNECTION_STRING")
+                            blob_container_name = os.getenv("AZURE_BLOB_CONTAINER_NAME")
+                            if not blob_connection_string or not blob_container_name:
+                                raise ValueError("Missing required environment variables for Azure Blob Storage.")
+
+                            blob_service_client = BlobServiceClient.from_connection_string(blob_connection_string)
+                            blob_client = blob_service_client.get_blob_client(container=blob_container_name, blob=filename)
+                            with open(filename, "rb") as data:
+                                blob_client.upload_blob(data, overwrite=True)
+                                
+                            # Get the full URL of the uploaded file
+                            file_urls.append({"name": filename, "url": blob_client.url})
+
+                            # delete local copies of the file
+                            os.remove(filename)
+                    
+                    last_msg = agents_client.messages.get_last_message_text_by_role(thread_id=thread.id, role=MessageRole.AGENT)
                     if last_msg:
                         print(f"Last Message: {last_msg.text.value}")
-    
-                    # Access the attributes of the annotation directly
-                    try:
-                        annotation = last_msg.text.annotations[0]
-                        print(annotation)
-                    except Exception as e:
-                        print(f"Error: {e}")
-                        return f"annotation error: {e}"
-
-                    # If you need to convert the annotation to a dictionary
-                    annotation_dict = {
-                        "type": annotation.type,
-                        "text": annotation.text,
-                        "file_path": annotation.file_path.file_id if annotation.file_path else None,
-                    }
-                    print(json.dumps(annotation_dict, indent=2))
-
-                    root, extension = os.path.splitext(annotation_dict["text"])
-                    file_name = str(uuid.uuid4()) + extension  # Convert UUID to string
-                    file_id = annotation_dict["file_path"]
-                    print(f"File name: {file_name}, File ID: {file_id}")
-                    
-                    project_client.agents.save_file(file_id=file_id, file_name=file_name)
-                    print(f"Saved the file to: {file_name}") 
-
-                    # save the newly created file
-                    
-                    blob_connection_string = os.getenv("AZURE_BLOB_CONNECTION_STRING")
-                    blob_container_name = os.getenv("AZURE_BLOB_CONTAINER_NAME")
-                    if not blob_connection_string or not blob_container_name:
-                        raise ValueError("Missing required environment variables for Azure Blob Storage.")
-
-                    blob_service_client = BlobServiceClient.from_connection_string(blob_connection_string)
-                    blob_client = blob_service_client.get_blob_client(container=blob_container_name, blob=file_name)
-                    with open(file_name, "rb") as data:
-                        blob_client.upload_blob(data, overwrite=True)
-
-                    # Get the full URL of the uploaded file
-                    file_url = blob_client.url
-                    
-                    # delete local copies of the file
-                    project_client.agents.delete_file(file_id)
-                    os.remove(file_name)
-                    if agent:
-                        project_client.agents.delete_agent(agent.id)
-                        
-                    print("Done. You can now access the file from the following URL:")
-                    print(file_url)   
-                   
-                    return(f"{last_msg.text.value} \nA copy in [cloud]({file_url})")
+        
+                    # delete agent
+                    agents_client.delete_agent(agent.id)
+                    print("Deleted agent")
+                     
+                    if len(file_urls)>0:
+                        file_url = ', '.join([f"[{file['name']}]({file['url']})" for file in file_urls])
+                        return(f"{last_msg.text.value} \nBlob copy: {file_url}")
+                    else:
+                        return(f"{last_msg.text.value}")
                     
                 except Exception as e:
                     print(f"Error: {e}")
@@ -263,70 +334,92 @@ class ChatAgentService:
         print(f"Query: {query}")    
         print(f"Temp dir: {temp_dir}")
         
-        project_client = AIProjectClient.from_connection_string(credential=DefaultAzureCredential(), conn_str=os.environ["AZURE_AI_AGENT_PROJECT_CONNECTION_STRING"],)
-        print(f"Created project client, project ID: {project_client}")
+        agent_name="agent_run_chat_docs"
+        agents_client = AgentsClient(credential=DefaultAzureCredential(), endpoint=os.environ["AZURE_AI_AGENT_PROJECT_ENDPOINT"])
+        print(f"Created project client, project ID: {agents_client}")
             
-        with project_client:
+        with agents_client:
             try:
                 user_message = query
                 print(f"User message: {user_message}")
                 
-                # create agent with code interpreter tool and tools_resources
-                agent = project_client.agents.create_agent(
-                    model=os.environ["AZURE_AI_AGENT_MODEL_DEPLOYMENT_NAME"],
-                    name="agent_run_chat_docs",
-                    instructions="You are helpful agent.",
-                )
-                print(f"Created agent, agent ID: {agent.id}")
-
                 # read in files from the temp directory
                 file_ids=[]
                 for file in os.listdir(temp_dir):
                     file_path = os.path.join(temp_dir, file)
                     print(f"File path: {file_path}")
                     # upload the file
-                    file = project_client.agents.upload_file_and_poll(file_path=file_path, purpose=FilePurpose.AGENTS)
+                    file = agents_client.files.upload_and_poll(file_path=file_path, purpose=FilePurpose.AGENTS)
                     file_ids.append(file.id)
                     print(f"Uploaded file, file ID: {file.id}")
 
                 # create a vector store with the file you uploaded
-                vector_store = project_client.agents.create_vector_store_and_poll(file_ids=[file.id], name="my_vectorstore")
+                vector_store = agents_client.vector_stores.create_and_poll(file_ids=[file.id], name=agent_name+"_vectorstore")
                 print(f"Created vector store, vector store ID: {vector_store.id}")
                 
                 # create a file search tool
                 file_search_tool = FileSearchTool(vector_store_ids=[vector_store.id])
+                print(f"File search tool: {file_search_tool}")
                 
-                thread = project_client.agents.create_thread(
-                    tool_resources=file_search_tool.resources
+                # Initialize agent bing tool and add the connection id
+                conn_id = os.environ["AZURE_AI_AGENT_BING_CONNECTION_NAME"]
+                bing = BingGroundingTool(connection_id=conn_id)
+                print(f"Bing grounding tool: {bing}")
+    
+                toolset = ToolSet()
+                toolset.add(file_search_tool)
+                toolset.add(bing)
+
+                # create agent with code interpreter tool and tools_resources
+                agent = agents_client.create_agent(
+                    model=os.environ["AZURE_AI_AGENT_MODEL_DEPLOYMENT_NAME"],
+                    name=agent_name,
+                    instructions="You are helpful agent.",
                 )
-                print(f"Created thread, thread ID: {thread.id}")
+                print(f"Created agent, agent ID: {agent.id}")
 
-                message = project_client.agents.create_message(
-                    thread_id=thread.id, role="user", content=user_message
+                # Create thread for communication
+                thread = agents_client.threads.create(
+                    tool_resources=toolset.resources,
                 )
-                print(f"Created message, message ID: {message.id}")
-
-                run = project_client.agents.create_and_process_run(thread_id=thread.id, agent_id=agent.id)
-
-                messages = project_client.agents.list_messages(thread_id=thread.id)
-                print(f"Messages: {messages}")
+                print(f"Created thread, ID: {thread.id}")
                 
-                for file_id in file_ids:
-                    if file_id:
-                        project_client.agents.delete_file(file_id)
-                if vector_store:
-                    project_client.agents.delete_vector_store(vector_store.id)
-                if agent:
-                    project_client.agents.delete_agent(agent.id)
-                if os.path.exists(temp_dir):
-                    shutil.rmtree(temp_dir)
-                    
-                last_msg = messages.get_last_text_message_by_role("assistant")
+                # create a message
+                message = agents_client.messages.create(    
+                    thread_id=thread.id,
+                    role="user",
+                    content=user_message + ".Verify the information with citations"
+                )
+
+                # Create and process agent run in thread with tools
+                run = agents_client.runs.create_and_process(thread_id=thread.id, agent_id=agent.id)
+                print(f"Run finished with status: {run.status}")
+                
+                if run.status == "failed":
+                    # Check if you got "Rate limit is exceeded.", then you want to get more quota
+                    print(f"Run failed: {run.last_error}")
+                    return f"Run failed: {run.last_error}"
+
+                
+                # [START teardown]
+                # Delete the file when done
+                agents_client.vector_stores.delete(vector_store.id)
+                print("Deleted vector store")
+
+                agents_client.files.delete(file_id=file.id)
+                print("Deleted file")
+
+                # Delete the agent when done
+                agents_client.delete_agent(agent.id)
+                print("Deleted agent")
+                # [END teardown]
+                
+                last_msg = agents_client.messages.get_last_message_text_by_role(thread_id=thread.id, role=MessageRole.AGENT)
                 if last_msg:
                     print(f"Last Message: {last_msg.text.value}")
                     return(f"{last_msg.text.value}")
                 else:
-                    return(f"No response from the assistant")
+                    return(f"")
             
             except Exception as e:
                         print(f"Error: {e}")
