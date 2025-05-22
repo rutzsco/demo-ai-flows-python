@@ -11,6 +11,8 @@ class Source:
 class ExecutionStep:
     name: str
     content: str
+    start_time: str | None = None
+    end_time: str | None = None
 
 @dataclass
 class ExecutionDiagnostics:

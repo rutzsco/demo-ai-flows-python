@@ -8,7 +8,7 @@ Content-Type: application/json
   "messages": [
     {
       "role": "User",
-      "content": "What is the weather in mankato MN"
+      "content": "What is the weather in mankato MN and Boston MA"
     }
   ]
 }
@@ -18,7 +18,7 @@ POST {{baseUrl}}/agent/weather
 Content-Type: application/json
 
 {
-  "message": "What is the weather in mankato MN",
+  "message": "What is the weather in mankato MN and Boston MA",
   "thread_id": ""
 }
 

@@ -19,11 +19,8 @@ from semantic_kernel.functions.kernel_arguments import KernelArguments
 from semantic_kernel.contents import ChatMessageContent, FunctionCallContent, StreamingChatMessageContent, StreamingAnnotationContent, StreamingFileReferenceContent, ImageContent, FileReferenceContent
 from azure.identity.aio import DefaultAzureCredential
 from semantic_kernel.agents import AzureAIAgent, AzureAIAgentSettings, AzureAIAgentThread
+from azure.ai.agents.models import CodeInterpreterTool, FileSearchTool, FilePurpose, FileSearchTool, CodeInterpreterTool
 
-from azure.ai.projects import AIProjectClient
-from azure.ai.projects.models import CodeInterpreterTool
-from azure.ai.projects.models import FilePurpose
-from azure.ai.projects.models import MessageRole, BingGroundingTool, FileSearchTool
 from azure.identity import DefaultAzureCredential
 from pathlib import Path
 import json
