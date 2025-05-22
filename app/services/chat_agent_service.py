@@ -42,6 +42,7 @@ from azure.ai.agents.models import (
     ThreadMessage,
     ThreadRun,
     RunStep,
+    VectorStore
 
 )
 from azure.identity import DefaultAzureCredential
@@ -126,19 +127,21 @@ class ChatAgentService:
                 AsyncDefaultAzureCredential() as creds,
                 AzureAIAgent.create_client(credential=creds, endpoint=os.getenv("AZURE_AI_AGENT_PROJECT_ENDPOINT"),) as agents_client,
             ):
-                '''
+                agent_name="agent_run_chat_sk"
+                
                 # upload the file
-                file = await agents_client.datasets.upload_file(name=temp_file_path, version="0", file_path=temp_file_path, purpose=FilePurpose.AGENTS)
-                print(f"Uploaded file, file ID: {file}")
-
+                file = await agents_client.agents.files.upload_and_poll(file_path=temp_file_path, purpose=FilePurpose.AGENTS)
+                os.remove(temp_file_path)
+                print(f"Uploaded file, file ID: {file.id}")
+                
                 # create a vector store with the file you uploaded
-                vector_store = agents_client.agents.vector_stores.create_and_poll(file_ids=[file.id], name=agent_name+"_vectorstore")
+                vector_store = await agents_client.agents.vector_stores.create_and_poll(file_ids=[file.id], name=agent_name+"_vectorstore")
                 print(f"Created vector store, vector store ID: {vector_store.id}")
                 
                 # create a file search tool
                 file_search_tool = FileSearchTool(vector_store_ids=[vector_store.id])
                 print(f"File search tool: {file_search_tool}")
-                '''
+                
                 # This callback function will be called for each intermediate message,
                 async def handle_intermediate_steps(message: ChatMessageContent) -> None:
                     for item in message.items or []:
@@ -150,28 +153,26 @@ class ChatAgentService:
                             print(f"{item}")
             
                 # Create agent definition
-                agent_name="agent_run_chat_sk"
                 agent_definition = await agents_client.agents.create_agent(
                     model=os.environ["MODEL_DEPLOYMENT_NAME"],
                     name=agent_name,
                     instructions="You are helpful agent",
+                    tools=file_search_tool.definitions,
+                    tool_resources=file_search_tool.resources, 
                 )
                 
                 # Create the AzureAI Agent
                 agent = AzureAIAgent(
                     client=agents_client,
                     definition=agent_definition,
-                    #tools=file_search_tool.definitions,
-                    #tool_resources=file_search_tool.resources, 
                 )
                     
                 thread: AzureAIAgentThread = None
                 
                 user_inputs = [
-                    "Hello",
-                    "What is the Smart Eyewear?",
-                    "What are the key features of the product?",
-                    "What are main components of the product?",
+                    "Hello, please help me with the following question based on uploaded files.",
+                    user_message,
+                    "who is Surti Pratik Kishor?",
                     "Thank you",
                 ]
 
@@ -183,6 +184,7 @@ class ChatAgentService:
                             messages=user_input,
                             thread=thread,
                             on_intermediate_message=handle_intermediate_steps,
+                            tools=file_search_tool.resources,
                         ):
                             print(f"# Agent: {response}")
                             last_msgs.append(f"{response}")
@@ -194,9 +196,10 @@ class ChatAgentService:
                                 
                     return(f"{last_msg}")    
                 finally:
+                    pass
                     # Cleanup: Delete the thread and agent
-                    await thread.delete() if thread else None
-                    await agents_client.agents.delete_agent(agent.id)
+                    #await thread.delete() if thread else None
+                    #await agents_client.agents.delete_agent(agent.id)
 
     async def run_chat_direct(self, request: ChatThreadRequest) -> str:
         agent_name="agent_run_chat_direct"
