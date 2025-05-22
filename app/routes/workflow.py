@@ -14,7 +14,7 @@ import uuid
 router = APIRouter()
 
 #sk_service = SemanticKernelService()
-#weather_service = WeatherAgentService()
+weather_service = WeatherAgentService()
 chat_agent_service = ChatAgentService()
 # azure_ai_agent_factory = AzureAIAgentFactory()
 

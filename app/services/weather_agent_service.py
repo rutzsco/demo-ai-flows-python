@@ -23,21 +23,15 @@ class WeatherAgentService:
         # Load environment variables from .env file
         load_dotenv()
 
-        # Retrieve configuration from environment variables
-        api_key = os.getenv("AZURE_OPENAI_API_KEY")
-        endpoint = os.getenv("AZURE_OPENAI_ENDPOINT")
-        deployment_name = os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT_NAME")
-        
-        if not api_key or not endpoint or not deployment_name:
-            raise ValueError("Missing required environment variables for OpenAI configuration.")
-    
+        # Get the required environment variables
         self.kernel = sk.Kernel()
-        self.kernel.add_service(AzureChatCompletion(
-            api_key=api_key,
-            endpoint=endpoint,
-            deployment_name=deployment_name,
+        chat_completion_service = AzureChatCompletion(
+            api_key=os.getenv("AZURE_OPENAI_API_KEY"),
+            endpoint=os.getenv("AZURE_OPENAI_ENDPOINT"),
+            deployment_name=os.getenv("AZURE_OPENAI_CHAT_DEPLOYMENT_NAME"),
             service_id="azure-chat-completion"
-        ))
+        )
+        self.kernel.add_service(chat_completion_service)
         self.kernel.add_plugin(WeatherPlugin(self.kernel), plugin_name="weather")
         self.file_service = FileService()
 
@@ -118,6 +112,7 @@ class WeatherAgentService:
             # Iterate over the async generator to get the final response
             response = None
             thread = None
+            print("user_message: ", user_message)
             
             async for result in agent.invoke(messages=user_message, thread=thread, on_intermediate_message=handle_intermediate_steps):
                 response = result
