@@ -6,7 +6,7 @@ from typing import Tuple, Optional, Any
 
 from azure.storage.blob import BlobServiceClient
 from azure.ai.projects import AIProjectClient
-from azure.ai.projects.models import FilePurpose
+from azure.ai.agents.models import FilePurpose
 from azure.identity import DefaultAzureCredential
 
 from semantic_kernel.contents import ChatMessageContent, ImageContent
