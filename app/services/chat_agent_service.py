@@ -84,6 +84,7 @@ class ChatAgentService:
                 sources = []
                 file_references = []
                 responseContent = ''
+                code_output_content = '' # Initialize code_output_content
                 try:
                     # Create the appropriate ChatMessageContent based on whether we have a file
                     cmc = create_chat_message_content(
@@ -95,12 +96,18 @@ class ChatAgentService:
                     
                     async for result in agent.invoke_stream(messages=cmc, thread=thread, on_intermediate_message=handle_intermediate_steps):
                         response = result
+                        
                         annotations.extend([item for item in result.items if isinstance(item, StreamingAnnotationContent)])
                         files.extend([item for item in result.items if isinstance(item, StreamingFileReferenceContent)])
                         if isinstance(result.message, StreamingChatMessageContent):
                             responseContent += result.message.content
                         else:
                             print(f"{result}")
+
+                        # Check for code in metadata
+                        if hasattr(result, 'metadata') and result.metadata and result.metadata.get("code") is True:
+                            if isinstance(result.message, StreamingChatMessageContent) and result.message.content:
+                                code_output_content += result.message.content
 
                         thread = response.thread
                     
@@ -114,9 +121,7 @@ class ChatAgentService:
                         sources.append(source)
 
                     for item in files:
-                        fr = FileReference(
-                            id=item.file_id if hasattr(item, 'file_id') else ''
-                        )
+                        fr = FileReference(id=item.file_id if hasattr(item, 'file_id') else '')
                         file_references.append(fr)
                 
                 finally:
@@ -127,7 +132,8 @@ class ChatAgentService:
                 sources=sources,
                 files=file_references,
                 intermediate_steps=intermediate_steps,
-                thread_id=thread.id
+                thread_id=thread.id,
+                code_content=code_output_content.strip() # Add code_output_content to RequestResult
             )
 
             return request_result

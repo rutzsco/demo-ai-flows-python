@@ -27,6 +27,7 @@ class RequestResult:
     sources: list[Source] = field(default_factory=list)
     files: list[Source] = field(default_factory=list)
     thread_id: str = None
+    code_content: str = None # Add new field for code content
 
 @dataclass
 class ChatMessage:
