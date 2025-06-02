@@ -10,13 +10,30 @@ Content-Type: application/json
   "thread_id": ""
 }
 
+### Demo - Chat  
+POST {{baseUrl}}/agent/chat
+Content-Type: application/json
+
+{
+  "message": "What is the weather forecast for today in New York City?",
+  "thread_id": ""
+}
+
+### Demo - Chat  
+POST {{baseUrl}}/agent/chat
+Content-Type: application/json
+
+{
+  "message": "Which team won the 2025 NCAA basketball championship?",
+  "thread_id": ""
+}
 
 ### Demo - Chat File
 POST {{baseUrl}}/agent/chat
 Content-Type: application/json
 
 {
-  "message": "What is the weather in mankato MN",
+  "message": "How do I change the oil?",
   "file" : "2019-Ford-Ranger-Owners-Manual.pdf",
   "thread_id": ""
 }

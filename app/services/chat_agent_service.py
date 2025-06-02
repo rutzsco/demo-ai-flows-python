@@ -116,7 +116,9 @@ class ChatAgentService:
                         source = Source(
                             quote=item.quote if hasattr(item, 'quote') else '',
                             title=item.title if hasattr(item, 'title') else '',
-                            url=item.url if hasattr(item, 'url') else ''
+                            url=item.url if hasattr(item, 'url') else '',
+                            start_index=item.start_index if hasattr(item, 'start_index') else '',
+                            end_index=item.end_index if hasattr(item, 'end_index') else ''
                         )
                         sources.append(source)
 

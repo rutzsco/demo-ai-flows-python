@@ -49,6 +49,8 @@ class Source:
     title: str
     quote: str = None
     url: str = None
+    start_index: str = None
+    end_index: str = None
 
 @dataclass
 class FileReference:
