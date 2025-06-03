@@ -41,15 +41,10 @@ async def download_and_process_file(blob_service_client: BlobServiceClient, file
         with open(temp_file_path, "wb") as f:
             f.write(file_content)
         
+
         # Create an AI Project client and upload the file
-        project_client = AIProjectClient.from_connection_string(
-            credential=DefaultAzureCredential(), 
-            conn_str=os.environ["AZURE_AI_AGENT_PROJECT_CONNECTION_STRING"]
-        )
-        ai_project_file = project_client.agents.upload_file_and_poll(
-            file_path=temp_file_path, 
-            purpose=FilePurpose.AGENTS
-        )
+        project_client = AIProjectClient(credential=DefaultAzureCredential(), endpoint=os.environ["AZURE_AI_AGENT_ENDPOINT"])
+        ai_project_file = project_client.agents.files.upload_and_poll(file_path=temp_file_path, purpose=FilePurpose.AGENTS)
         print(f"Uploaded file to AI Project service with ID: {ai_project_file.id}")
         
     except Exception as e:
@@ -89,7 +84,9 @@ def create_chat_message_content(user_message: str, file_content=None, file_name=
         image_content = ImageContent(data_uri=data_url)
         
         # Create the chat message with both text and image content
-        return ChatMessageContent(role=AuthorRole.USER, content=user_message, items=[image_content])
+        cmc = ChatMessageContent(role=AuthorRole.USER, content=user_message)
+        cmc.items.append(image_content)
+        return cmc
     else:
         # Regular text-only message
         return ChatMessageContent(role=AuthorRole.USER, content=user_message)

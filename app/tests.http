@@ -22,23 +22,6 @@ Content-Type: application/json
   "thread_id": ""
 }
 
-### Demo - Chat  
-POST {{baseUrl}}/agent/chat
-Content-Type: application/json
-
-{
-  "message": "Simulate 10,000 rolls of two six-sided dice and estimate the probability distribution of their sum. Show me a bar chart.",
-  "thread_id": ""
-}
-
-### Demo - chat-direct Note: try this in a browser as it may ask you to download a file.
-POST {{baseUrl}}/agent/chat-direct
-Content-Type: application/json
-
-{
-  "message": "Simulate 10,000 rolls of two six-sided dice and estimate the probability distribution of their sum. Show the result in a bar chart and save it in a pdf file.",
-  "thread_id": ""
-}
 
 ### Demo - chat-docs
 POST {{baseUrl}}/agent/chat-docs
@@ -56,43 +39,4 @@ Content-Type: application/json
     }
   ],
   "query": "Between Toyota Corolla and Honda Civic, please analyze and compare:  Price: The initial cost of the car and its overall value for money. This includes considering any financing options, discounts, and the long-term cost of ownership.  Fuel Efficiency: How economical the car is in terms of fuel consumption. This is especially important for those looking to save on fuel costs and reduce their environmental impact.  Safety Features: The availability and effectiveness of safety features like airbags, anti-lock braking systems (ABS), and crash test ratings. Ensuring the car has robust safety measures is crucial for protecting passengers.  Finally give me a purchase suggestion."
-}
-
-### Demo - Chat Weather 
-POST {{baseUrl}}/agent/chat
-Content-Type: application/json
-
-{
-  "message": "What is the weather in mankato MN",
-  "thread_id": ""
-}
-
-### Create Azure AI Agent
-POST {{baseUrl}}/agent/chat/create
-Content-Type: application/json
-
-{
-  "instructions": "You are a helpful assistant",
-  "name": "ChatAssistantV2",
-  "model": "gpt-4.1"
-}
-
-### Demo - Chat File
-POST {{baseUrl}}/agent/chat
-Content-Type: application/json
-
-{
-  "message": "What is the weather in mankato MN",
-  "file" : "2019-Ford-Ranger-Owners-Manual.pdf",
-  "thread_id": ""
-}
-
-### Demo - Chat File
-POST {{baseUrl}}/agent/chat
-Content-Type: application/json
-
-{
-  "message": "Plesse describe the damage to the car",
-  "file" : "car1.jpg",
-  "thread_id": ""
 }

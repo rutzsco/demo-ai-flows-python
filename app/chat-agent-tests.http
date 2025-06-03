@@ -33,9 +33,18 @@ POST {{baseUrl}}/agent/chat
 Content-Type: application/json
 
 {
-  "message": "How do I change the oil?",
+  "message": "How do I change the oil? Use the provided manual.",
   "file" : "2019-Ford-Ranger-Owners-Manual.pdf",
   "thread_id": ""
+}
+
+### Demo - Chat File
+POST {{baseUrl}}/agent/chat
+Content-Type: application/json
+
+{
+  "message": "What is the part number for the oil filter?",
+  "thread_id": "thread_TyFQT3SeYMShnNeik8EHHaSF"
 }
 
 ### Demo - Chat File
