@@ -13,7 +13,6 @@ azure-identity==1.23.0
 azure-ai-agents==1.0.0
 azure-ai-inference==1.0.0b9
 azure-ai-projects==1.0.0b11
-azure_storage==0.37.0
 
 opentelemetry-sdk
 opentelemetry-instrumentation-fastapi
