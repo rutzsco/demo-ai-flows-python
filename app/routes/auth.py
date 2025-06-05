@@ -16,7 +16,8 @@ class APIKeyMiddleware(BaseHTTPMiddleware):
         super().__init__(app)
         self.api_key = os.getenv("API_KEY")
         self.require_auth = self.api_key is not None
-      async def dispatch(self, request: Request, call_next):
+    
+    async def dispatch(self, request: Request, call_next):
         # Skip authentication if API_KEY environment variable is not set
         if not self.require_auth:
             response = await call_next(request)
