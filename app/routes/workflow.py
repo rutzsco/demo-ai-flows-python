@@ -1,6 +1,7 @@
-from fastapi import APIRouter, UploadFile, Form, status
+from fastapi import APIRouter, UploadFile, Form, status, Depends
 from fastapi.responses import JSONResponse
-from typing import List
+from fastapi.security import APIKeyHeader
+from typing import List, Optional
 from pydantic import BaseModel
 from app.models.api_models import ChatRequest, ChatThreadRequest, AgentCreateRequest
 from app.services.sk import SemanticKernelService
@@ -14,6 +15,9 @@ import os
 import uuid
 router = APIRouter()
 
+# Define API Key security scheme
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
 sk_service = SemanticKernelService()
 weather_service = WeatherAgentService()
 chat_agent_service = ChatAgentService()
@@ -24,7 +28,7 @@ class WorkflowInput(BaseModel):
     data: str
 
 @router.post("/workflow")
-async def run_workflow(input_data: WorkflowInput):
+async def run_workflow(input_data: WorkflowInput, api_key: Optional[str] = Depends(api_key_header)):
     """
     POST endpoint for executing a Semantic Kernel workflow.
     """
@@ -32,7 +36,7 @@ async def run_workflow(input_data: WorkflowInput):
     return {"result": result}
 
 @router.post("/weather")
-async def run_weather_workflow(input_data: ChatRequest):
+async def run_weather_workflow(input_data: ChatRequest, api_key: Optional[str] = Depends(api_key_header)):
     """
     POST endpoint for executing a weather workflow.
     """
@@ -40,7 +44,7 @@ async def run_weather_workflow(input_data: ChatRequest):
     return {"result": result}
 
 @router.post("/agent/weather")
-async def run_weather_workflow(input_data: ChatThreadRequest):
+async def run_weather_workflow(input_data: ChatThreadRequest, api_key: Optional[str] = Depends(api_key_header)):
     """
     POST endpoint for executing a weather workflow.
     """
@@ -48,7 +52,7 @@ async def run_weather_workflow(input_data: ChatThreadRequest):
     return {"result": result}
 
 @router.post("/agent/chat")
-async def run_weather_workflow(input_data: ChatThreadRequest):
+async def run_weather_workflow(input_data: ChatThreadRequest, api_key: Optional[str] = Depends(api_key_header)):
     """
     POST endpoint for executing a weather workflow.
     """
@@ -56,7 +60,7 @@ async def run_weather_workflow(input_data: ChatThreadRequest):
     return {"result": result}
 
 @router.post("/agent/chat-direct")
-async def run_weather_workflow(input_data: ChatThreadRequest):
+async def run_weather_workflow(input_data: ChatThreadRequest, api_key: Optional[str] = Depends(api_key_header)):
     """
     POST endpoint for executing a weather workflow.
     """
@@ -70,6 +74,7 @@ class Message(BaseModel):
 async def chat_docs(
     files: List[UploadFile],
     query: str = Form(...),
+    api_key: Optional[str] = Depends(api_key_header)
 ):
     message = Message(query=query)
     
@@ -88,7 +93,7 @@ async def chat_docs(
     return {"result": result}
 
 @router.post("/agent/chat/create")
-async def run_weather_workflow(input_data: AgentCreateRequest):
+async def run_weather_workflow(input_data: AgentCreateRequest, api_key: Optional[str] = Depends(api_key_header)):
     """
     POST endpoint for executing a weather workflow.
     """

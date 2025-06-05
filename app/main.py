@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from fastapi.security import APIKeyHeader
 from .routes.workflow import router as workflow_router
 from .routes.default_endpoints import router as status_router
 from .routes.auth import APIKeyMiddleware
@@ -75,6 +76,9 @@ else:
 
 # FastAPI app setup
 app = FastAPI()
+
+# Define API Key security scheme for Swagger UI
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 # Add API key middleware
 app.add_middleware(APIKeyMiddleware)
