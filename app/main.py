@@ -1,8 +1,6 @@
 from fastapi import FastAPI
-from fastapi.security import APIKeyHeader
 from .routes.workflow import router as workflow_router
 from .routes.default_endpoints import router as status_router
-from .routes.auth import APIKeyMiddleware
 import logging
 from azure.monitor.opentelemetry.exporter import (
     AzureMonitorLogExporter,
@@ -77,13 +75,9 @@ else:
 # FastAPI app setup
 app = FastAPI()
 
-# Define API Key security scheme for Swagger UI
-api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
-
-# Add API key middleware
-app.add_middleware(APIKeyMiddleware)
-
 app.include_router(workflow_router)
 app.include_router(status_router)
+
+# Add OpenTelemetry instrumentation
 FastAPIInstrumentor.instrument_app(app)
 

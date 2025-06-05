@@ -1,49 +1,41 @@
 import os
-from fastapi import HTTPException, Request, status
-from fastapi.security import HTTPBearer
-from starlette.middleware.base import BaseHTTPMiddleware
+from fastapi import HTTPException, Depends, status
+from fastapi.security import APIKeyHeader
+from typing import Optional
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
+
+# Define API Key security scheme
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
 
-class APIKeyMiddleware(BaseHTTPMiddleware):
+async def get_api_key(api_key: Optional[str] = Depends(api_key_header)):
     """
-    Middleware to enforce API key authentication when the API_KEY environment variable is set.
+    Dependency to enforce API key authentication when the API_KEY environment variable is set.
     
     If API_KEY environment variable is present, all requests must include a matching
     X-API-Key header. If the environment variable is not set, authentication is bypassed.
     """
+    expected_api_key = os.getenv("API_KEY")
     
-    def __init__(self, app):
-        super().__init__(app)
-        self.api_key = os.getenv("API_KEY")
-        self.require_auth = self.api_key is not None
+    # Skip authentication if API_KEY environment variable is not set
+    if not expected_api_key:
+        return None  # No authentication required
     
-    async def dispatch(self, request: Request, call_next):
-        # Skip authentication if API_KEY environment variable is not set
-        if not self.require_auth:
-            response = await call_next(request)
-            return response
-        
-        # Skip authentication for Swagger documentation endpoints
-        if request.url.path in ["/docs", "/openapi.json", "/redoc"]:
-            response = await call_next(request)
-            return response
-        
-        # Check for X-API-Key header
-        api_key_header = request.headers.get("X-API-Key")
-        
-        if not api_key_header:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Missing X-API-Key header"
-            )
-        
-        # Validate the API key
-        if api_key_header != self.api_key:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid API key"
-            )
-        
-        # Proceed with the request if authentication is successful
-        response = await call_next(request)
-        return response
+    # Check for X-API-Key header
+    if not api_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing X-API-Key header"
+        )
+    
+    # Validate the API key
+    if api_key != expected_api_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API key"
+        )
+    
+    return api_key
