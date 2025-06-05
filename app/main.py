@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from .routes.workflow import router as workflow_router
 from .routes.default_endpoints import router as status_router
+from .routes.auth import APIKeyMiddleware
 import logging
 from azure.monitor.opentelemetry.exporter import (
     AzureMonitorLogExporter,
@@ -74,6 +75,10 @@ else:
 
 # FastAPI app setup
 app = FastAPI()
+
+# Add API key middleware
+app.add_middleware(APIKeyMiddleware)
+
 app.include_router(workflow_router)
 app.include_router(status_router)
 FastAPIInstrumentor.instrument_app(app)

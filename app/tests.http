@@ -1,8 +1,10 @@
 @baseUrl = http://127.0.0.1:8000
+@apiKey = your-api-key-here
 
 ### Demo - Weather  
 POST {{baseUrl}}/weather
 Content-Type: application/json
+X-API-Key: {{apiKey}}
 
 {
   "messages": [
@@ -16,6 +18,7 @@ Content-Type: application/json
 ### Demo - Weather  
 POST {{baseUrl}}/agent/weather
 Content-Type: application/json
+X-API-Key: {{apiKey}}
 
 {
   "message": "What is the weather in mankato MN and Boston MA",
@@ -26,6 +29,7 @@ Content-Type: application/json
 ### Demo - chat-docs
 POST {{baseUrl}}/agent/chat-docs
 Content-Type: application/json
+X-API-Key: {{apiKey}}
 
 {
   "files": [
