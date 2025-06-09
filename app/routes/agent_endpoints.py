@@ -3,7 +3,6 @@ from fastapi.responses import JSONResponse
 from typing import List, Optional
 from pydantic import BaseModel
 from app.models.api_models import ChatRequest, ChatThreadRequest, AgentCreateRequest
-from app.services.sk import SemanticKernelService
 from app.services.weather_agent_service import WeatherAgentService
 from app.services.chat_agent_service import ChatAgentService
 from app.services.chat_agent_service_direct import ChatAgentServiceDirect
@@ -15,7 +14,6 @@ import os
 import uuid
 router = APIRouter()
 
-sk_service = SemanticKernelService()
 weather_service = WeatherAgentService()
 chat_agent_service = ChatAgentService()
 chat_agent_service_direct = ChatAgentServiceDirect()
@@ -24,13 +22,6 @@ azure_ai_agent_factory = AzureAIAgentFactory()
 class WorkflowInput(BaseModel):
     data: str
 
-@router.post("/workflow")
-async def run_workflow(input_data: WorkflowInput, api_key: Optional[str] = Depends(get_api_key)):
-    """
-    POST endpoint for executing a Semantic Kernel workflow.
-    """
-    result = await sk_service.run_workflow(input_data.data)
-    return {"result": result}
 
 @router.post("/weather")
 async def run_weather_workflow(input_data: ChatRequest, api_key: Optional[str] = Depends(get_api_key)):
