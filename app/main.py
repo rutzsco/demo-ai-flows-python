@@ -1,5 +1,5 @@
 from fastapi import FastAPI
-from .routes.workflow import router as workflow_router
+from .routes.agent_endpoints import router as workflow_router
 from .routes.default_endpoints import router as status_router
 import logging
 from azure.monitor.opentelemetry.exporter import (
