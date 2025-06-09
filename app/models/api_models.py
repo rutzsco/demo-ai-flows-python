@@ -3,10 +3,12 @@ from typing import List
 
 @dataclass
 class Source:
-    quote: str
     title: str
-    url: str
-
+    quote: str = None
+    url: str = None
+    start_index: str = None
+    end_index: str = None
+    
 @dataclass
 class ExecutionStep:
     name: str
@@ -44,13 +46,7 @@ class ChatThreadRequest:
     file: str = None
     thread_id: str = None
 
-@dataclass
-class Source:
-    title: str
-    quote: str = None
-    url: str = None
-    start_index: str = None
-    end_index: str = None
+
 
 @dataclass
 class FileReference:
